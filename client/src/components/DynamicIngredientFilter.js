@@ -1,0 +1,55 @@
+import { useEffect, useState } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
+
+export default function DynamicIngredientFilter({ selected, onChange }) {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const snapshot = await getDocs(collection(db, 'ingredientCategories'));
+      setCategories(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+      setLoading(false);
+    };
+    fetchCategories();
+  }, []);
+
+  const toggleIngredient = (ingredient) => {
+    onChange(prev => 
+      prev.includes(ingredient)
+        ? prev.filter(i => i !== ingredient)
+        : [...prev, String(ingredient).trim()] // Ensure string
+    );
+  };
+
+  if (loading) return <div className="animate-pulse h-40 bg-gray-100 rounded-lg"></div>;
+
+  return (
+    <div className="space-y-6">
+      {categories.map(category => (
+        <div key={category.id}>
+          <h4 className="font-medium mb-2">{category.name}</h4>
+          <div className="flex flex-wrap gap-2">
+            {category.items.map(item => (
+              <button
+                key={item}
+                onClick={() => toggleIngredient(item)}
+                className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  selected.includes(item)
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

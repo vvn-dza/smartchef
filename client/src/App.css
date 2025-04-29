@@ -23,3 +23,9 @@
   font-size: 16px;
   cursor: pointer;
 }
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}

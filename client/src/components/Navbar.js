@@ -1,24 +1,45 @@
-import { useLocation } from 'react-router-dom';  // Add this at the top
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiMenu, FiX, FiBookmark, FiUser, FiLogOut } from 'react-icons/fi';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const location = useLocation(); // Track current route
+  const [user, setUser] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setUser(user);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showProfileDropdown && !event.target.closest('.profile-dropdown-container')) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileDropdown]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      navigate('/login');
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // Add active link styling
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -41,24 +62,26 @@ const Navbar = () => {
             >
               <FiBookmark className="mr-1" /> Saved
             </Link>
-            
-            {/* Profile dropdown remains the same */}
-            <div className="relative">
+
+            {/* Profile dropdown */}
+            <div className="relative profile-dropdown-container">
               <button 
                 onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                 className="flex items-center px-3 py-2 text-gray-700 hover:text-blue-600"
               >
                 <FiUser className="mr-1" /> Profile
               </button>
-              
+
               {showProfileDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                  <Link
-                    to="/profile"
-                    className={`block px-4 py-2 text-sm ${isActive('/profile') ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-blue-50'}`}
-                  >
-                    View Profile
-                  </Link>
+                  {user && (
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
+                    >
+                      My Profile
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center"
@@ -70,7 +93,7 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Mobile menu button - remains the same */}
+          {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -91,12 +114,16 @@ const Navbar = () => {
           >
             <FiBookmark className="inline mr-2" /> Saved Recipes
           </Link>
-          <Link
-            to="/profile"
-            className={`block px-3 py-2 ${isActive('/profile') ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-blue-50'} rounded`}
-          >
-            <FiUser className="inline mr-2" /> Profile
-          </Link>
+
+          {user && (
+            <Link
+              to="/profile"
+              className="block px-3 py-2 text-gray-700 hover:bg-blue-50 rounded"
+            >
+              <FiUser className="inline mr-2" /> My Profile
+            </Link>
+          )}
+
           <button
             onClick={handleLogout}
             className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 rounded flex items-center"

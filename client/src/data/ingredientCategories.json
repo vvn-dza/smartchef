@@ -1,0 +1,49 @@
+{
+    "categories": [
+      {
+        "name": "Vegetables & Greens",
+        "ingredients": ["Carrot", "Broccoli", "Spinach", "Potato", "Cucumber", "Peppers", "Green Beans", "Zucchini", "Squash", "Beets", "Sweet Potato"]
+      },
+      {
+        "name": "Fruits",
+        "ingredients": ["Banana", "Apple", "Orange", "Grapes", "Mango", "Pineapple", "Melon", "Pear", "Kiwi", "Strawberry", "Raspberry", "Blueberry"]
+      },
+      {
+        "name": "Berries",
+        "ingredients": ["Blueberry", "Raspberry", "Blackberry", "Highbush Blueberry", "Mulberry", "Elderberry", "Loganberry"]
+      },
+      {
+        "name": "Nuts & Seeds",
+        "ingredients": ["Almonds", "Walnuts", "Pistachio", "Cashew", "Sunflower Seed", "Pumpkin Seed", "Chia Seed", "Flaxseed", "Oats"]
+      },
+      {
+        "name": "Cheeses",
+        "ingredients": ["Mozzarella", "Cheddar", "Parmesan", "Brie", "Gouda", "Camembert", "Feta", "Blue Cheese", "Ricotta"]
+      },
+      {
+        "name": "Dairy & Eggs",
+        "ingredients": ["Milk", "Butter", "Cream", "Sour Milk", "Heavy Whipping Cream", "Ceviche", "Egg", "Omelet Mix"]
+      },
+      {
+        "name": "Meats & Poultry",
+        "ingredients": ["Beef", "Chicken", "Pork", "Turkey", "Duck", "Quail", "Veal", "Rabbit", "Salmon"]
+      },
+      {
+        "name": "Fish & Seafood",
+        "ingredients": ["Salmon", "Tuna", "Cod", "Halibut", "Shrimp", "Crab", "Clams", "Mussels", "Scallops"]
+      },
+      {
+        "name": "Herbs & Spices",
+        "ingredients": ["Basil", "Oregano", "Cilantro", "Thyme", "Rosemary", "Cayenne Pepper", "Turmeric", "Ginger", "Garlic", "Chives"]
+      },
+      {
+        "name": "Sugar & Sweeteners",
+        "ingredients": ["Granulated Sugar", "Brown Sugar", "Honey", "Maple Syrup", "Powdered Sugar", "Rice Syrup", "Stevia"]
+      },
+      {
+        "name": "Grains & Cereals",
+        "ingredients": ["Wheat", "White Rice", "Brown Rice", "Oats", "Barley", "Rye", "Triticale", "Soba Noodles", "Udon Noodles"]
+      }
+    ]
+  }
+  

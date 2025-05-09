@@ -2,7 +2,6 @@ import { FiX, FiClock, FiBookmark, FiShare2, FiUsers, FiChevronDown, FiChevronUp
 import { useRecipes } from '../context/RecipesContext';
 import { useToast } from '../context/ToastContext';
 import { useEffect, useState } from 'react';
-import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import RecipeCard from '../components/RecipeCard';
 
 export default function RecipeDetail() {
@@ -16,63 +15,24 @@ export default function RecipeDetail() {
   } = useRecipes();
   
   const { showToast } = useToast();
-  const [imageUrl, setImageUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [relatedRecipes, setRelatedRecipes] = useState([]);
 
-  // Enhanced image loading with cache and error handling
-  useEffect(() => {
-    if (!selectedRecipe) return;
+  // Token-based image URL generator
+  const getImageUrl = (path) => {
+    if (!path) return '/placeholder-food.jpg';
+    
+    // Keep the original filename exactly as stored
+    const filename = path.includes('/') 
+      ? path.split('/').pop() // Get part after last slash
+      : path;
+    
+    return `https://firebasestorage.googleapis.com/v0/b/smartchef-app-c4b56.firebasestorage.app/o/recipes%2F${encodeURIComponent(filename)}?alt=media&token=6e63aebc-a87e-4855-b05b-660a2dd2bb1c`;
+  };
 
-    let isMounted = true;
-    const storage = getStorage();
+  const imageUrl = selectedRecipe ? getImageUrl(selectedRecipe.imagePath) : '';
 
-    const loadImage = async () => {
-      if (!selectedRecipe.imagePath) {
-        if (isMounted) {
-          setImageUrl('/placeholder-food.jpg');
-          setIsLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const imageRef = ref(storage, selectedRecipe.imagePath);
-        const url = await getDownloadURL(imageRef);
-        
-        // Verify the URL is valid
-        const img = new Image();
-        img.onload = () => {
-          if (isMounted) {
-            setImageUrl(url);
-            setIsLoading(false);
-          }
-        };
-        img.onerror = () => {
-          if (isMounted) {
-            setImageUrl('/placeholder-food.jpg');
-            setIsLoading(false);
-          }
-        };
-        img.src = url;
-      } catch (error) {
-        console.error('Image load error:', error);
-        if (isMounted) {
-          setImageUrl('/placeholder-food.jpg');
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadImage();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedRecipe]);
-
-  // Get related recipes
+  // Related recipes calculation
   useEffect(() => {
     if (!selectedRecipe || !recipes.length) return;
 
@@ -80,29 +40,20 @@ export default function RecipeDetail() {
       typeof i === 'string' ? i.toLowerCase() : i.name?.toLowerCase()
     ) || [];
 
-    const related = recipes.filter(recipe => {
-      if (recipe.id === selectedRecipe.id) return false;
-      const recipeIngredients = recipe.ingredients?.map(i => 
-        typeof i === 'string' ? i.toLowerCase() : i.name?.toLowerCase()
-      ) || [];
-      
-      const common = currentIngredients.filter(ing => 
-        recipeIngredients.includes(ing)
-      );
-      return common.length >= 2;
-    }).slice(0, 3);
-
-    setRelatedRecipes(related);
+    setRelatedRecipes(
+      recipes.filter(recipe => {
+        if (recipe.id === selectedRecipe.id) return false;
+        const recipeIngredients = recipe.ingredients?.map(i => 
+          typeof i === 'string' ? i.toLowerCase() : i.name?.toLowerCase()
+        ) || [];
+        return currentIngredients.some(ing => recipeIngredients.includes(ing));
+      }).slice(0, 3)
+    );
   }, [selectedRecipe, recipes]);
 
-  // Body overflow handling
   useEffect(() => {
-    if (selectedRecipe) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (selectedRecipe) document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = '' };
   }, [selectedRecipe]);
 
   if (!selectedRecipe) return null;
@@ -187,7 +138,6 @@ export default function RecipeDetail() {
       onClick={(e) => e.target === e.currentTarget && closeRecipeModal()}
     >
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-white p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold">{selectedRecipe.title}</h2>
           <div className="flex gap-3">
@@ -218,128 +168,102 @@ export default function RecipeDetail() {
           </div>
         </div>
         
-        {/* Content */}
         <div className="p-6">
-          {/* Loading Skeleton */}
-          {isLoading && (
-            <div className="space-y-4">
-              <div className="h-8 bg-gray-200 rounded w-3/4 animate-pulse"></div>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="w-full h-64 bg-gray-200 rounded-lg animate-pulse"></div>
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
-                  ))}
-                </div>
-              </div>
+          {/* Description moved to top */}
+          {selectedRecipe.description && (
+            <div className="mb-6">
+              <p className="text-gray-600">
+                {showFullDescription ? selectedRecipe.description : truncatedDescription}
+              </p>
+              {shouldTruncateDescription && (
+                <button
+                  onClick={() => setShowFullDescription(!showFullDescription)}
+                  className="text-blue-600 hover:text-blue-800 text-sm mt-1 flex items-center"
+                >
+                  {showFullDescription ? (
+                    <><FiChevronUp className="mr-1" /> Show less</>
+                  ) : (
+                    <><FiChevronDown className="mr-1" /> Show more</>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
-          {!isLoading && (
-            <>
-              {/* Description */}
-              {selectedRecipe.description && (
-                <div className="mb-4">
-                  <p className="text-gray-600">
-                    {showFullDescription ? selectedRecipe.description : truncatedDescription}
-                  </p>
-                  {shouldTruncateDescription && (
-                    <button
-                      onClick={() => setShowFullDescription(!showFullDescription)}
-                      className="text-blue-600 hover:text-blue-800 text-sm mt-1 flex items-center"
-                    >
-                      {showFullDescription ? (
+          {/* Image and ingredients grid */}
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <img 
+                src={imageUrl}
+                alt={selectedRecipe.title}
+                className="w-full h-auto max-h-64 object-cover rounded-lg shadow-sm"
+                loading="eager"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/placeholder-food.jpg';
+                }}
+              />
+            </div>
+            
+            <div>
+              <h3 className="font-bold text-lg mb-2">Ingredients</h3>
+              <ul className="space-y-2">
+                {selectedRecipe.ingredients.map((ing, i) => (
+                  <li key={i} className="flex items-start">
+                    <span className="inline-block w-2 h-2 bg-gray-400 rounded-full mt-2 mr-2"></span>
+                    <span>
+                      {typeof ing === 'string' ? ing : (
                         <>
-                          <FiChevronUp className="mr-1" /> Show less
-                        </>
-                      ) : (
-                        <>
-                          <FiChevronDown className="mr-1" /> Show more
+                          {ing.original || ing.name}
+                          {ing.amount && <span className="text-gray-500 ml-1">({ing.amount})</span>}
                         </>
                       )}
-                    </button>
-                  )}
-                </div>
-              )}
-              
-              {/* Meta */}
-              <div className="flex flex-wrap gap-3 mb-4">
-                {selectedRecipe.prepTime && (
-                  <div className="flex items-center text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
-                    <FiClock className="mr-1" />
-                    <span>{selectedRecipe.prepTime} min</span>
-                  </div>
-                )}
-                {selectedRecipe.servings && (
-                  <div className="flex items-center text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
-                    <FiUsers className="mr-1" />
-                    <span>{selectedRecipe.servings} servings</span>
-                  </div>
-                )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Prep time and servings */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            {selectedRecipe.prepTime && (
+              <div className="flex items-center text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
+                <FiClock className="mr-1" />
+                <span>{selectedRecipe.prepTime} min</span>
               </div>
-              
-              {/* Image + Ingredients */}
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <img 
-                    src={imageUrl}
-                    alt={selectedRecipe.title}
-                    className="w-full h-auto max-h-64 object-cover rounded-lg shadow-sm"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = '/placeholder-food.jpg';
+            )}
+            {selectedRecipe.servings && (
+              <div className="flex items-center text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
+                <FiUsers className="mr-1" />
+                <span>{selectedRecipe.servings} servings</span>
+              </div>
+            )}
+          </div>
+
+          {/* Instructions and tags */}
+          {renderInstructions()}
+          {renderTags()}
+          
+          {/* Related recipes */}
+          {relatedRecipes.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-bold mb-4">You Might Also Like</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {relatedRecipes.map(recipe => (
+                  <div 
+                    key={recipe.id} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRecipe(recipe);
                     }}
-                  />
-                </div>
-                
-                <div>
-                  <h3 className="font-bold text-lg mb-2">Ingredients</h3>
-                  <ul className="space-y-2">
-                    {selectedRecipe.ingredients.map((ing, i) => (
-                      <li key={i} className="flex items-start">
-                        <span className="inline-block w-2 h-2 bg-gray-400 rounded-full mt-2 mr-2"></span>
-                        <span>
-                          {typeof ing === 'string' ? ing : (
-                            <>
-                              {ing.original || ing.name}
-                              {ing.amount && <span className="text-gray-500 ml-1">({ing.amount})</span>}
-                            </>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              
-              {/* Instructions */}
-              {renderInstructions()}
-              
-              {/* Tags */}
-              {renderTags()}
-              
-              {/* Related Recipes */}
-              {relatedRecipes.length > 0 && (
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold mb-4">You Might Also Like</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {relatedRecipes.map(recipe => (
-                      <div 
-                        key={recipe.id} 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedRecipe(recipe);
-                          setIsLoading(true);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <RecipeCard recipe={recipe} />
-                      </div>
-                    ))}
+                    className="cursor-pointer"
+                  >
+                    <RecipeCard recipe={recipe} />
                   </div>
-                </div>
-              )}
-            </>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

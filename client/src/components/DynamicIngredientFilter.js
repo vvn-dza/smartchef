@@ -18,12 +18,13 @@ export default function DynamicIngredientFilter({ selected, onChange }) {
     fetchCategories();
   }, []);
 
+  // Updated: Use passed 'selected' state directly
   const toggleIngredient = (ingredient) => {
-    onChange(prev => 
-      prev.includes(ingredient)
-        ? prev.filter(i => i !== ingredient)
-        : [...prev, String(ingredient).trim()] // Ensure string
-    );
+    const newSelection = selected.includes(ingredient)
+      ? selected.filter(i => i !== ingredient)
+      : [...selected, String(ingredient).trim()];
+    
+    onChange(newSelection); // Pass the new array directly
   };
 
   if (loading) return <div className="animate-pulse h-40 bg-gray-100 rounded-lg"></div>;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Disclosure } from '@headlessui/react';
+//import { Disclosure } from '@headlessui/react';
 import { FiChevronDown, FiChevronRight, FiX, FiSearch } from 'react-icons/fi';
 import ingredientData from '../data/ingredientCategories.json';
 
@@ -9,7 +9,6 @@ const IngredientCategoryFilter = ({ selected = [], onChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [localSelected, setLocalSelected] = useState([]);
 
-  // Initialize with all categories from JSON
   useEffect(() => {
     const categoryMap = {};
     ingredientData.categories.forEach((category) => {
@@ -19,40 +18,37 @@ const IngredientCategoryFilter = ({ selected = [], onChange }) => {
     setLocalSelected(selected);
   }, [selected]);
 
-  // Handle filter toggle
+  // Updated: Handle filter toggle
   const handleToggle = (ingredient) => {
     const newSelected = localSelected.includes(ingredient)
       ? localSelected.filter(i => i !== ingredient)
       : [...localSelected, ingredient];
     
     setLocalSelected(newSelected);
-    onChange(newSelected); // Propagate changes to parent
+    onChange(newSelected); // Now correctly updates parent
   };
 
-  // Clear all filters
+  // Updated: Clear all filters
   const clearAllFilters = () => {
-    setLocalSelected([]);
-    onChange([]); // This is crucial - actually clears the filters
+    onChange([]); // This will now properly clear all filters
     setSearchTerm('');
+    setLocalSelected([]); // Keep local state in sync
   };
 
-  // Filter categories based on search term
   const filteredCategories = Object.entries(categories).reduce((acc, [category, ingredients]) => {
     const filteredIngredients = ingredients.filter(ingredient =>
       ingredient.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    
     if (filteredIngredients.length > 0) {
       acc[category] = filteredIngredients;
     }
-    
     return acc;
   }, {});
 
   return (
     <div className="p-4 bg-white rounded shadow-md max-h-[80vh] overflow-y-auto sticky top-4">
       <h2 className="text-xl font-semibold mb-4">Filter Ingredients</h2>
-      
+
       {/* Search and Clear */}
       <div className="mb-4">
         <div className="relative mb-2">

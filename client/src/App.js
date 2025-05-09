@@ -1,3 +1,4 @@
+// src/App.js
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { RecipesProvider } from './context/RecipesContext';
 import { ToastProvider } from './context/ToastContext';
@@ -5,6 +6,7 @@ import Login from './authentication/Login';
 import SignUp from './authentication/SignUp';
 import Dashboard from './pages/Dashboard';
 import SavedRecipes from './pages/SavedRecipes';
+import RecipeBrowser from './pages/RecipeBrowser'; // Add this import
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import RecipeDetail from './pages/RecipeDetail';
@@ -34,6 +36,7 @@ export default function App() {
             {/* Main routes (with navbar/footer) */}
             <Route path="/" element={<Layout><Dashboard /></Layout>} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/browse" element={<Layout><RecipeBrowser /></Layout>} /> {/* Add this route */}
             <Route path="/saved" element={<Layout><SavedRecipes /></Layout>} />
             <Route path="/profile" element={<Layout><Profile /></Layout>} />
             <Route path="/contact" element={<Layout><Contact /></Layout>} />

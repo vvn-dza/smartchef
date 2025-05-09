@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useState, useEffect } from 'react';
-import { FiMenu, FiX, FiBookmark, FiUser, FiLogOut } from 'react-icons/fi';
+import { FiMenu, FiX, FiBookmark, FiUser, FiLogOut, FiCompass } from 'react-icons/fi';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,31 +12,18 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(user => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
       setUser(user);
     });
     return unsubscribe;
   }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showProfileDropdown && !event.target.closest('.profile-dropdown-container')) {
-        setShowProfileDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showProfileDropdown]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       navigate('/login');
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Logout error:', error);
     }
   };
 
@@ -47,25 +34,31 @@ const Navbar = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand */}
-          <Link 
-            to="/dashboard" 
-            className={`text-xl font-bold ${isActive('/dashboard') ? 'text-blue-600' : 'text-gray-800'}`}
+          <Link
+            to="/dashboard"
+            className={`text-xl font-bold ${isActive('/dashboard') ? 'text-blue-600' : 'text-gray-800'} hover:text-blue-600`}
           >
             SmartChef
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link 
-              to="/saved" 
+            <Link
+              to="/browse"
+              className={`flex items-center px-3 py-2 ${isActive('/browse') ? 'text-blue-600 font-medium' : 'text-gray-700 hover:text-blue-600'}`}
+            >
+              <FiCompass className="mr-1" /> Browse
+            </Link>
+            <Link
+              to="/saved"
               className={`flex items-center px-3 py-2 ${isActive('/saved') ? 'text-blue-600 font-medium' : 'text-gray-700 hover:text-blue-600'}`}
             >
               <FiBookmark className="mr-1" /> Saved
             </Link>
 
             {/* Profile dropdown */}
-            <div className="relative profile-dropdown-container">
-              <button 
+            <div className="relative">
+              <button
                 onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                 className="flex items-center px-3 py-2 text-gray-700 hover:text-blue-600"
               >
@@ -108,6 +101,12 @@ const Navbar = () => {
       {/* Mobile Navigation */}
       {isOpen && (
         <div className="md:hidden bg-white pb-3 px-4">
+          <Link
+            to="/browse"
+            className={`block px-3 py-2 ${isActive('/browse') ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-blue-50'} rounded`}
+          >
+            <FiCompass className="inline mr-2" /> Browse
+          </Link>
           <Link
             to="/saved"
             className={`block px-3 py-2 ${isActive('/saved') ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-blue-50'} rounded`}

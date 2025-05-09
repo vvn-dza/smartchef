@@ -1,3 +1,4 @@
+// src/context/RecipeContext.js
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { auth, db } from '../firebaseConfig';
 import {
@@ -22,7 +23,6 @@ export function RecipesProvider({ children }) {
   const [saving, setSaving] = useState(false);
   const [lastFetched, setLastFetched] = useState(null);
 
-  // Fetch all recipes with 5-minute caching
   const fetchRecipes = useCallback(async () => {
     if (lastFetched && Date.now() - lastFetched < 300000) return;
 
@@ -48,7 +48,6 @@ export function RecipesProvider({ children }) {
     }
   }, [lastFetched]);
 
-  // Auth state listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
       setUser(user);
@@ -56,7 +55,6 @@ export function RecipesProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  // Real-time listener for saved recipes
   useEffect(() => {
     if (!user) {
       setSavedRecipes([]);
@@ -81,12 +79,10 @@ export function RecipesProvider({ children }) {
     return unsubscribe;
   }, [user]);
 
-  // Initial data load
   useEffect(() => {
     fetchRecipes();
   }, [fetchRecipes]);
 
-  // Toggle saved recipe
   const toggleSavedRecipe = async (recipeId) => {
     if (!user) return;
 
@@ -121,6 +117,7 @@ export function RecipesProvider({ children }) {
       const ingredientNames = recipe.ingredients.map(ing =>
         ing.name.toLowerCase().trim()
       );
+
       return selectedIngredients.every(selectedIng =>
         ingredientNames.some(name =>
           name.includes(selectedIng.toLowerCase().trim())

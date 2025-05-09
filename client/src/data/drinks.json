@@ -1,0 +1,28 @@
+{
+    "categories": [
+      {
+        "name": "Alcoholic Spirits",
+        "ingredients": ["Vodka", "Gin", "Rum", "Whiskey", "Tequila", "Brandy", "Cognac", "Absinthe"]
+      },
+      {
+        "name": "Wines",
+        "ingredients": ["Red Wine", "White Wine", "Rosé", "Sparkling Wine", "Champagne", "Port", "Sherry"]
+      },
+      {
+        "name": "Beers",
+        "ingredients": ["Lager", "Ale", "Stout", "Pilsner", "IPA", "Wheat Beer", "Sour Beer"]
+      },
+      {
+        "name": "Cocktails",
+        "ingredients": ["Mojito", "Margarita", "Martini", "Old Fashioned", "Cosmopolitan", "Daiquiri", "Manhattan"]
+      },
+      {
+        "name": "Non-Alcoholic",
+        "ingredients": ["Soda", "Juice", "Iced Tea", "Lemonade", "Sparkling Water", "Coffee", "Tea", "Mocktail Mixes"]
+      },
+      {
+        "name": "Mixers & Garnishes",
+        "ingredients": ["Tonic Water", "Soda Water", "Grenadine", "Simple Syrup", "Bitters", "Lime", "Lemon", "Mint", "Olives"]
+      }
+    ]
+  }

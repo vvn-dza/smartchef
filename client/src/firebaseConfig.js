@@ -24,11 +24,12 @@ import {
   deleteObject
 } from 'firebase/storage';
 
+// Hardcoded config (temporarily for testing)
 const firebaseConfig = {
   apiKey: "AIzaSyDgy5oBH_JyyFPsrDoLPMw-L6jH4_J2K_4",
   authDomain: "smartchef-app-c4b56.firebaseapp.com",
   projectId: "smartchef-app-c4b56",
-  storageBucket: "smartchef-app-c4b56.firebasestorage.app",
+  storageBucket: "smartchef-app-c4b56.appspot.com", // Changed from .firebasestorage.app
   messagingSenderId: "681401308799",
   appId: "1:681401308799:web:5799700cbd71d74b24d14a",
   measurementId: "G-328ZVJRKKQ"
@@ -36,22 +37,21 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// Enable offline persistence
+// Enable offline persistence with strict equality checks
 enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code == 'failed-precondition') {
+  if (err.code === 'failed-precondition') {
     console.warn("Offline persistence can only be enabled in one tab at a time.");
-  } else if (err.code == 'unimplemented') {
-    console.warn("The current browser does not support all of the features required to enable offline persistence.");
+  } else if (err.code === 'unimplemented') {
+    console.warn("The current browser does not support all required features for offline persistence.");
   }
 });
 
-// Export all required Firebase functions and references
 export { 
   app,
   analytics,
@@ -59,17 +59,14 @@ export {
   googleProvider,
   db,
   storage,
-  // Auth functions
   updateProfile,
   deleteUser,
-  // Firestore functions
   doc,
   setDoc,
   getDoc,
   deleteDoc,
   collection,
   onSnapshot,
-  // Storage functions
   ref,
   uploadBytes,
   getDownloadURL,

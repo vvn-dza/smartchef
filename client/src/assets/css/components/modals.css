@@ -1,0 +1,202 @@
+@import '../variables.css';
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-container {
+  background-color: var(--color-white);
+  border-radius: var(--radius-lg);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 100%;
+  box-shadow: var(--shadow-2xl);
+}
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  background-color: var(--color-white);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+
+.modal-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.modal-close:hover {
+  color: var(--color-gray-700);
+}
+
+.modal-body {
+  padding: var(--space-4);
+}
+
+.modal-footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-gray-200);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Recipe Modal */
+.recipe-modal {
+  max-width: 56rem;
+}
+
+.recipe-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .recipe-modal-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.recipe-modal-image {
+  width: 100%;
+  height: auto;
+  max-height: 24rem;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+
+.recipe-modal-meta {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.recipe-modal-meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  background-color: var(--color-gray-100);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+}
+
+.recipe-modal-section {
+  margin-top: var(--space-6);
+}
+
+.recipe-modal-section-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+  margin-bottom: var(--space-3);
+}
+
+.recipe-modal-ingredients {
+  list-style-type: none;
+}
+
+.recipe-modal-ingredient {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: var(--space-2);
+}
+
+.recipe-modal-ingredient-bullet {
+  width: var(--space-2);
+  height: var(--space-2);
+  background-color: var(--color-gray-400);
+  border-radius: var(--radius-full);
+  margin-top: var(--space-2);
+  margin-right: var(--space-2);
+}
+
+.recipe-modal-instructions {
+  list-style-type: none;
+  counter-reset: instruction-counter;
+}
+
+.recipe-modal-instruction {
+  counter-increment: instruction-counter;
+  margin-bottom: var(--space-3);
+  display: flex;
+}
+
+.recipe-modal-instruction::before {
+  content: counter(instruction-counter) ".";
+  font-weight: var(--font-weight-bold);
+  margin-right: var(--space-2);
+  min-width: var(--space-6);
+}
+
+.recipe-modal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.recipe-modal-tag {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.recipe-modal-tag-cuisine {
+  background-color: var(--color-blue-100);
+  color: var(--color-blue-800);
+}
+
+.recipe-modal-tag-dietary {
+  background-color: var(--color-green-100);
+  color: var(--color-green-800);
+}
+
+.recipe-modal-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.recipe-modal-related {
+  margin-top: var(--space-8);
+}
+
+.recipe-modal-related-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+  margin-bottom: var(--space-4);
+}
+
+.recipe-modal-related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-4);
+}

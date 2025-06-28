@@ -5,8 +5,8 @@ import { ToastProvider } from './context/ToastContext';
 import Login from './authentication/Login';
 import SignUp from './authentication/SignUp';
 import Dashboard from './pages/Dashboard';
+import AISearch from './pages/AISearch'; // Import the AI search page
 import SavedRecipes from './pages/SavedRecipes';
-import RecipeBrowser from './pages/RecipeBrowser'; // Add this import
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import RecipeDetail from './pages/RecipeDetail';
@@ -29,21 +29,21 @@ export default function App() {
       <RecipesProvider>
         <Router>
           <Routes>
-            {/* Auth routes (no navbar/footer) */}
+            {/* Auth routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
 
-            {/* Main routes (with navbar/footer) */}
+            {/* Main routes */}
             <Route path="/" element={<Layout><Dashboard /></Layout>} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/browse" element={<Layout><RecipeBrowser /></Layout>} /> {/* Add this route */}
+            <Route path="/search" element={<Layout><AISearch /></Layout>} /> {/* New AI search route */}
             <Route path="/saved" element={<Layout><SavedRecipes /></Layout>} />
             <Route path="/profile" element={<Layout><Profile /></Layout>} />
             <Route path="/contact" element={<Layout><Contact /></Layout>} />
             <Route path="/terms" element={<Layout><Terms /></Layout>} />
             <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
 
-            {/* Recipe detail modal (available on all pages) */}
+            {/* Recipe detail modal */}
             <Route path="/recipe/:id" element={<Layout><Dashboard /></Layout>} />
           </Routes>
 

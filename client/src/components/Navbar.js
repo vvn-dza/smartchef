@@ -1,8 +1,10 @@
+// src/components/Navbar.js
+
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useState, useEffect } from 'react';
-import { FiMenu, FiX, FiBookmark, FiUser, FiLogOut, FiCompass } from 'react-icons/fi';
+import { FiMenu, FiX, FiBookmark, FiUser, FiLogOut, FiSearch } from 'react-icons/fi';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -44,10 +46,10 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
             <Link
-              to="/browse"
-              className={`flex items-center px-3 py-2 ${isActive('/browse') ? 'text-blue-600 font-medium' : 'text-gray-700 hover:text-blue-600'}`}
+              to="/search"
+              className={`flex items-center px-3 py-2 ${isActive('/search') ? 'text-blue-600 font-medium' : 'text-gray-700 hover:text-blue-600'}`}
             >
-              <FiCompass className="mr-1" /> Browse
+              <FiSearch className="mr-1" /> AI Search
             </Link>
             <Link
               to="/saved"
@@ -102,10 +104,10 @@ const Navbar = () => {
       {isOpen && (
         <div className="md:hidden bg-white pb-3 px-4">
           <Link
-            to="/browse"
-            className={`block px-3 py-2 ${isActive('/browse') ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-blue-50'} rounded`}
+            to="/search"
+            className={`block px-3 py-2 ${isActive('/search') ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-blue-50'} rounded`}
           >
-            <FiCompass className="inline mr-2" /> Browse
+            <FiSearch className="inline mr-2" /> AI Search
           </Link>
           <Link
             to="/saved"

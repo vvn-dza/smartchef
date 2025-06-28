@@ -27,7 +27,7 @@ export default function RecipeDetail() {
       ? path.split('/').pop() // Get part after last slash
       : path;
     
-    return `https://firebasestorage.googleapis.com/v0/b/smartchef-app-c4b56.firebasestorage.app/o/recipes%2F${encodeURIComponent(filename)}?alt=media&token=6e63aebc-a87e-4855-b05b-660a2dd2bb1c`;
+    return `https://firebasestorage.googleapis.com/v0/b/smartchef-app-c4b56.firebasestorage.app/o/recipes%2F${encodeURIComponent(filename)}?alt=media&token=279a2435-0e0d-4234-b462-3465b25edf15`;
   };
 
   const imageUrl = selectedRecipe ? getImageUrl(selectedRecipe.imagePath) : '';

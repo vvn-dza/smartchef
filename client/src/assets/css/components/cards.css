@@ -1,0 +1,109 @@
+@import '../variables.css';
+
+.card {
+  background-color: var(--color-medium);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-image {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+.card-body {
+  padding: var(--space-md);
+}
+
+.card-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-sm);
+}
+
+.card-description {
+  color: var(--color-light);
+  font-size: var(--text-sm);
+}
+
+/* Recipe Card Specific */
+.recipe-card {
+  background-color: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  height: 22rem;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.recipe-card-image-container {
+  width: 100%;
+  height: 12rem;
+  background-color: var(--color-light);
+  overflow: hidden;
+  position: relative;
+}
+
+.recipe-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.recipe-card:hover .recipe-card-image {
+  transform: scale(1.05);
+}
+
+.recipe-card-content {
+  padding: var(--space-md);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.recipe-card-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-sm);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 3rem;
+}
+
+.recipe-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.recipe-card-time {
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--color-medium);
+}
+
+.recipe-card-save {
+  color: var(--color-light);
+  transition: color 0.2s ease;
+}
+
+.recipe-card-save:hover,
+.recipe-card-save.saved {
+  color: var(--color-accent);
+}

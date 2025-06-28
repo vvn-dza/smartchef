@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRecipes } from '../context/RecipesContext';
 import { useToast } from '../context/ToastContext';
-import { FiClock, FiBookmark } from 'react-icons/fi';
-
-// const STORAGE_TOKEN = '6e63aebc-a87e-4855-b05b-660a2dd2bb1c'; // Your Firebase token
-// const STORAGE_BASE_URL = 'https://firebasestorage.googleapis.com/v0/b/smartchef-app-c4b56.firebasestorage.app/o';
+import { FiClock, FiBookmark, FiStar, FiUsers, FiZap } from 'react-icons/fi';
 
 export default function RecipeCard({ recipe }) {
   const { toggleSavedRecipe, savedRecipes, setSelectedRecipe, user, saving } = useRecipes();
@@ -12,22 +9,31 @@ export default function RecipeCard({ recipe }) {
   const [imageUrl, setImageUrl] = useState('');
   const [imageLoading, setImageLoading] = useState(true);
 
-  const isSaved = savedRecipes.some(r => r.id === recipe.id);
+  // Move guard clause AFTER all hooks
+  const isSaved = savedRecipes.some(r => r.id === recipe?.id);
+  const isAIGenerated = recipe?.isAIGenerated || recipe?.aiData;
 
   useEffect(() => {
-    const getImageUrl = (path) => {
-      if (!path) return '/placeholder-food.jpg';
-      
-      // Keep original filename exactly as stored (with - prefix if exists)
-      const filename = path.includes('/') 
-        ? path.split('/').pop() 
-        : path;
+    // Early return inside useEffect if no recipe
+    if (!recipe) return;
 
-      return `https://firebasestorage.googleapis.com/v0/b/smartchef-app-c4b56.firebasestorage.app/o/recipes%2F${encodeURIComponent(filename)}?alt=media&token=6e63aebc-a87e-4855-b05b-660a2dd2bb1c`;
+    const getImageUrl = () => {
+      // If it's an AI-generated recipe with direct image URL
+      if (isAIGenerated && recipe.aiData?.imageUrl) {
+        return recipe.aiData.imageUrl;
+      }
+      
+      // For database recipes
+      if (recipe.imagePath) {
+        const filename = recipe.imagePath.includes('/') ? recipe.imagePath.split('/').pop() : recipe.imagePath;
+        return `https://firebasestorage.googleapis.com/v0/b/smartchef-app-c4b56.firebasestorage.app/o/recipes%2F${encodeURIComponent(filename)}?alt=media&token=6e63aebc-a87e-4855-b05b-660a2dd2bb1c`;
+      }
+      
+      return '/placeholder-food.jpg';
     };
 
     const loadImage = () => {
-      const url = getImageUrl(recipe.imagePath);
+      const url = getImageUrl();
       const img = new Image();
       img.src = url;
       img.onload = () => {
@@ -41,7 +47,10 @@ export default function RecipeCard({ recipe }) {
     };
 
     loadImage();
-  }, [recipe.imagePath]);
+  }, [recipe, isAIGenerated]);
+
+  // Guard clause AFTER all hooks
+  if (!recipe) return null;
 
   const formatPrepTime = (minutes) => {
     if (!minutes) return '--';
@@ -70,18 +79,52 @@ export default function RecipeCard({ recipe }) {
     }
   };
 
+  // Get recipe data (AI or database) - Fixed data extraction
+  const getRecipeData = () => {
+    if (isAIGenerated && recipe.aiData) {
+      return {
+        title: recipe.aiData.title || recipe.title || 'Untitled Recipe',
+        ingredients: recipe.aiData.ingredients || recipe.ingredients || [],
+        prepTime: recipe.aiData.prepTime || recipe.prepTime || 30,
+        servings: recipe.aiData.servings || recipe.servings || 4,
+        difficulty: recipe.aiData.difficulty,
+        cuisine: recipe.aiData.cuisine
+      };
+    }
+    return {
+      title: recipe.title || 'Untitled Recipe',
+      ingredients: recipe.ingredients || [],
+      prepTime: recipe.prepTime || 30,
+      servings: recipe.servings || 4,
+      difficulty: recipe.difficulty,
+      cuisine: recipe.cuisine
+    };
+  };
+
+  const recipeData = getRecipeData();
+
   return (
     <div 
-      className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all cursor-pointer h-[22rem] flex flex-col"
-      onClick={() => setSelectedRecipe(recipe)}>
-      <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
+      className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer overflow-hidden group relative"
+      onClick={() => setSelectedRecipe(recipe)}
+    >
+      {/* AI Badge */}
+      {isAIGenerated && (
+        <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 shadow-lg">
+          <FiZap className="w-3 h-3" />
+          AI
+        </div>
+      )}
+
+      {/* Image Container */}
+      <div className="relative h-48 overflow-hidden">
         {imageLoading ? (
           <div className="w-full h-full bg-gray-200 animate-pulse"></div>
         ) : (
           <img
             src={imageUrl}
-            alt={recipe.title}
-            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            alt={recipeData.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             onError={(e) => {
               e.target.onerror = null;
@@ -89,40 +132,74 @@ export default function RecipeCard({ recipe }) {
             }}
           />
         )}
+        
+        {/* Save Button */}
+        <button
+          onClick={handleSaveClick}
+          disabled={saving}
+          className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-200 ${
+            isSaved 
+              ? 'bg-red-500 text-white shadow-lg' 
+              : 'bg-white/80 text-gray-600 hover:bg-white hover:shadow-lg'
+          } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+          aria-label={isSaved ? "Remove from saved" : "Save recipe"}
+        >
+          <FiBookmark className={isSaved ? 'fill-current' : ''} />
+        </button>
       </div>
 
-      <div className="p-4 flex flex-col flex-grow">
-        <h3 className="text-lg font-bold line-clamp-2 mb-2 min-h-[3rem]">
-          {recipe.title}
+      {/* Content */}
+      <div className="p-4 flex flex-col h-40">
+        {/* Recipe Title - Bold and modern */}
+        <h3 className="font-bold text-lg text-gray-800 mb-2 line-clamp-2 leading-tight">
+          {recipeData.title}
         </h3>
 
-        {recipe.ingredients?.length > 0 && (
-          <div className="mt-2">
-            <h4 className="text-sm font-medium text-gray-500 mb-1">Contains:</h4>
-            <ul className="text-xs text-gray-600 space-y-1">
-              {recipe.ingredients.slice(0, 3).map((ing, index) => (
-                <li key={index} className="line-clamp-1">
-                  {typeof ing === 'string' ? ing : ing.original || ing.name}
+        {/* Ingredients */}
+        {recipeData.ingredients && recipeData.ingredients.length > 0 && (
+          <div className="mb-3">
+            <h4 className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Contains:</h4>
+            <ul className="space-y-0.5">
+              {recipeData.ingredients.slice(0, 2).map((ing, index) => (
+                <li key={index} className="text-xs text-gray-600 truncate">
+                  {typeof ing === 'string' ? ing : ing.original || ing.name || 'Unknown ingredient'}
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <div className="flex justify-between items-center mt-auto">
-          <span className="flex items-center text-sm text-gray-600">
-            <FiClock className="mr-1" /> {formatPrepTime(recipe.prepTime)}
-          </span>
-          <button
-            onClick={handleSaveClick}
-            disabled={saving}
-            className={`transition-colors ${
-              isSaved ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-            } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
-            aria-label={isSaved ? "Remove from saved" : "Save recipe"}
-          >
-            <FiBookmark size={18} fill={isSaved ? 'currentColor' : 'none'} />
-          </button>
+        {/* Tags for AI recipes */}
+        {isAIGenerated && (recipeData.difficulty || recipeData.cuisine) && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {recipeData.difficulty && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                <FiStar className="w-2 h-2 mr-1" />
+                {recipeData.difficulty}
+              </span>
+            )}
+            {recipeData.cuisine && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                {recipeData.cuisine}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Metadata - Bottom aligned */}
+        <div className="mt-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center text-xs text-gray-600 font-medium">
+              <FiClock className="w-3 h-3 mr-1" /> 
+              {formatPrepTime(recipeData.prepTime)}
+            </span>
+            {recipeData.servings && (
+              <span className="flex items-center text-xs text-gray-600 font-medium">
+                <FiUsers className="w-3 h-3 mr-1" /> 
+                {recipeData.servings}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

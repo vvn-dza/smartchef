@@ -2,6 +2,9 @@
 /server/config/serviceAccountKey.json
 
 
+/firebase-config.json
+../firebase-config.json
+
 # dependencies
 /node_modules
 /.pnp
@@ -29,3 +32,5 @@ yarn-debug.log*
 yarn-error.log*
 
 .env
+../.env
+

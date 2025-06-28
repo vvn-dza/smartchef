@@ -2,9 +2,7 @@
 /server/config/serviceAccountKey.json
 
 
-/client/src/firebaseConfig.json
-../firebaseConfig.json
-../firebaseConfig.json
+/src/firebaseConfig.json
 
 # dependencies
 /node_modules

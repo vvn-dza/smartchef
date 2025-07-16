@@ -28,17 +28,22 @@ export default function Profile() {
         navigate('/login');
         return;
       }
-      
+
       try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        let displayName = auth.currentUser.displayName || '';
+        let email = auth.currentUser.email || '';
         if (userDoc.exists()) {
-          setUserData(userDoc.data());
-          setFormData({
-            displayName: userDoc.data().displayName || auth.currentUser.displayName || '',
-            email: auth.currentUser.email || '',
-            photoURL: userDoc.data().photoURL || auth.currentUser.photoURL || ''
-          });
+          const data = userDoc.data();
+          displayName = data.displayName || displayName;
+          email = data.email || email;
+          setUserData(data);
         }
+        setFormData({
+          displayName,
+          email,
+          photoURL: auth.currentUser.photoURL || ''
+        });
       } catch (err) {
         console.error("Error fetching user data:", err);
         showToast('Failed to load profile data', 'error');
@@ -145,157 +150,180 @@ export default function Profile() {
   );
 
   return (
-    <div className="max-w-md mx-auto px-4 py-8">
-      {/* Back Button */}
-      <button 
-        onClick={() => navigate('/dashboard')} 
-        className="flex items-center text-gray-600 hover:text-blue-600 mb-6"
-      >
-        <FiArrowLeft className="mr-2" /> Back to Dashboard
-      </button>
-
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+    <div className="max-w-md mx-auto px-4 py-6 sm:py-10">
+      <div className="bg-[#23483b] rounded-lg shadow-lg overflow-hidden border border-[#326755]">
         {/* Profile Header */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-center relative">
-          <div className="absolute top-4 right-4 flex gap-2">
+        <div className="bg-gradient-to-r from-[#0b9766] to-[#059669] p-6 sm:p-8 text-center relative">
+          <div className="absolute top-4 sm:top-5 right-4 sm:right-5 flex gap-2">
             <button 
               onClick={() => setEditMode(!editMode)}
-              className="bg-white p-2 rounded-full shadow-md hover:bg-gray-100"
+              className="bg-[#23483b] p-2 rounded-full shadow-lg hover:bg-[#326755] border border-[#326755] transition-colors duration-150 relative group"
+              title={editMode ? 'Save' : 'Edit'}
             >
-              {editMode ? <FiSave size={18} /> : <FiEdit size={18} />}
+              {editMode ? <FiSave size={18} className="text-[#91cab6]" /> : <FiEdit size={18} className="text-[#91cab6]" />}
+              <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-xs text-[#91cab6] opacity-0 group-hover:opacity-100 transition-opacity">{editMode ? 'Save' : 'Edit'}</span>
             </button>
           </div>
           
-          <div className="relative w-32 h-32 mx-auto">
+          <div className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto">
             <img
-              src={formData.photoURL || '/default-profile.png'}
+              src={auth.currentUser?.photoURL || '/default-profile.png'}
               alt="Profile"
-              className="w-full h-full rounded-full object-cover border-4 border-white shadow-md"
+              className="w-full h-full rounded-full object-cover border-4 border-[#23483b] shadow-lg bg-[#19342a]"
               onError={(e) => {
                 e.target.onerror = null;
                 e.target.src = '/default-profile.png';
               }}
             />
-            {editMode && (
-              <div className="absolute bottom-0 right-0 flex gap-2">
-                {formData.photoURL && (
-                  <button
-                    onClick={handleRemovePhoto}
-                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-                    title="Remove photo"
-                  >
-                    <FiX size={16} />
-                  </button>
-                )}
-                <label className="bg-blue-500 text-white p-2 rounded-full cursor-pointer hover:bg-blue-600">
-                  <FiUpload size={16} />
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    accept="image/*"
-                  />
-                </label>
-              </div>
-            )}
           </div>
           
-          <h1 className="text-2xl font-bold text-white mt-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-white mt-4 sm:mt-5 drop-shadow-sm">
             {formData.displayName || 'User'}
           </h1>
-          <p className="text-blue-100">{formData.email}</p>
+          <p className="text-[#91cab6] text-sm mt-1">{formData.email}</p>
         </div>
 
         {/* Profile Content */}
-        <div className="p-6">
+        <div className="p-6 sm:p-7 lg:p-8">
           {editMode ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FiUser className="mr-2" /> Name
+                <label className="block text-sm font-medium text-[#91cab6] mb-1 flex items-center">
+                  <FiUser className="mr-2 text-[#0b9766]" /> Name
                 </label>
-                <input
-                  type="text"
-                  value={formData.displayName}
-                  onChange={(e) => setFormData({...formData, displayName: e.target.value})}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.displayName}
+                    onChange={(e) => setFormData({...formData, displayName: e.target.value})}
+                    className="w-full rounded-lg border border-[#326755] shadow-sm focus:border-[#0b9766] focus:ring-2 focus:ring-[#0b9766] bg-[#19342a] text-white placeholder-[#91cab6] pl-10 py-2 transition-all"
+                    required
+                  />
+                </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FiMail className="mr-2" /> Email
+                <label className="block text-sm font-medium text-[#91cab6] mb-1 flex items-center">
+                  <FiMail className="mr-2 text-[#0b9766]" /> Email
                 </label>
                 <input
                   type="email"
                   value={formData.email}
                   disabled
-                  className="w-full rounded-md border-gray-300 shadow-sm bg-gray-100"
+                  className="w-full rounded-lg border border-[#326755] shadow-sm bg-[#19342a] text-white pl-10 py-2 opacity-50 cursor-not-allowed"
                 />
               </div>
-              
-              <div className="pt-4">
+
+              <div>
+                <label className="block text-sm font-medium text-[#91cab6] mb-1 flex items-center">
+                  <FiUpload className="mr-2 text-[#0b9766]" /> Profile Picture
+                </label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#19342a] border border-[#326755] text-white hover:bg-[#23483b] transition-colors text-sm"
+                  >
+                    <FiUpload size={16} />
+                    Upload Photo
+                  </button>
+                  {formData.photoURL && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-sm"
+                    >
+                      <FiTrash2 size={16} />
+                      Remove
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2"
+                  className="flex-1 bg-[#0b9766] text-white py-2 px-4 rounded-lg hover:bg-[#059669] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {uploading ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditMode(false)}
+                  className="flex-1 bg-[#23483b] text-white py-2 px-4 rounded-lg hover:bg-[#19342a] transition-colors text-sm sm:text-base"
+                >
+                  Cancel
                 </button>
               </div>
             </form>
           ) : (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Account Information</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-600">
-                    <span className="font-medium">Name:</span> {formData.displayName}
-                  </p>
-                  <p className="text-gray-600 mt-2">
-                    <span className="font-medium">Email:</span> {formData.email}
-                  </p>
-                  <p className="text-gray-600 mt-2">
-                    <span className="font-medium">Joined:</span> {new Date(userData?.createdAt?.seconds * 1000).toLocaleDateString()}
-                  </p>
-                </div>
+                <label className="block text-sm font-medium text-[#91cab6] mb-1 flex items-center">
+                  <FiUser className="mr-2 text-[#0b9766]" /> Name
+                </label>
+                <p className="text-white text-sm sm:text-base">{formData.displayName || 'Not set'}</p>
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-[#91cab6] mb-1 flex items-center">
+                  <FiMail className="mr-2 text-[#0b9766]" /> Email
+                </label>
+                <p className="text-white text-sm sm:text-base">{formData.email}</p>
+              </div>
+
+              <div className="pt-4">
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100"
+                  onClick={() => setEditMode(true)}
+                  className="w-full bg-[#0b9766] text-white py-2 px-4 rounded-lg hover:bg-[#059669] transition-colors text-sm sm:text-base"
                 >
-                  <FiTrash2 /> Delete Account
+                  Edit Profile
                 </button>
               </div>
             </div>
           )}
+
+          {/* Delete Account Section */}
+          <div className="mt-8 pt-6 border-t border-[#326755]">
+            <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">Danger Zone</h3>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm sm:text-base"
+            >
+              Delete Account
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-4">Confirm Account Deletion</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#23483b] rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-white font-bold mb-4">Delete Account</h3>
+            <p className="text-[#91cab6] mb-6 text-sm sm:text-base">
+              Are you sure you want to delete your account? This action cannot be undone.
             </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
-              >
-                Cancel
-              </button>
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleDeleteAccount}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2"
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm sm:text-base"
               >
-                <FiTrash2 /> Delete
+                Delete Account
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 bg-[#23483b] text-white py-2 px-4 rounded-lg hover:bg-[#19342a] transition-colors text-sm sm:text-base"
+              >
+                Cancel
               </button>
             </div>
           </div>

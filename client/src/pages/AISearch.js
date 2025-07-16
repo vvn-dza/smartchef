@@ -1,12 +1,28 @@
-import { useState, useRef } from 'react';
-import { FiSearch, FiCamera, FiUpload, FiArrowLeft, FiClock, FiUsers, FiStar, FiYoutube, FiSave, FiShare2 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { FiSearch, FiCamera, FiUpload, FiArrowLeft, FiClock, FiUsers, FiStar, FiYoutube, FiSave, FiShare2, FiImage, FiZap } from 'react-icons/fi';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
 import { GoogleGenAI } from '@google/genai';
+import AIRecipeCard from '../components/AIRecipeCard';
 
 console.log("API Key loaded:", !!process.env.REACT_APP_GEMINI_API_KEY);
 console.log("API Key length:", process.env.REACT_APP_GEMINI_API_KEY?.length);
+console.log("YouTube API Key:", process.env.REACT_APP_YOUTUBE_API_KEY ? 'Present' : 'Missing');
+console.log("YouTube API Key length:", process.env.REACT_APP_YOUTUBE_API_KEY?.length);
+
+const SPOONACULAR_API_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
+
+// Helper to test if an image URL is valid and loads
+const testImageUrl = (url) => {
+  return new Promise((resolve) => {
+    if (!url) return resolve(false);
+    const img = new window.Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+};
 
 export default function AISearch() {
   const [searchText, setSearchText] = useState('');
@@ -18,10 +34,33 @@ export default function AISearch() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { toggleSavedRecipe, savedRecipes, user } = useRecipes();
+  const [showRecipeCard, setShowRecipeCard] = useState(false);
+  const location = useLocation();
+  const triggeredByUrl = useRef(false);
 
   const ai = new GoogleGenAI({
     apiKey: process.env.REACT_APP_GEMINI_API_KEY
   });
+
+  // 1. When the URL changes, set searchText if there's a query param
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlQuery = params.get('query');
+    if (urlQuery && urlQuery !== searchText) {
+      setSearchText(urlQuery);
+      triggeredByUrl.current = true;
+    }
+    // eslint-disable-next-line
+  }, [location.search]);
+
+  // 2. When searchText changes (from URL), trigger the search
+  useEffect(() => {
+    if (triggeredByUrl.current && searchText) {
+      generateRecipe();
+      triggeredByUrl.current = false;
+    }
+    // eslint-disable-next-line
+  }, [searchText]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -36,6 +75,92 @@ export default function AISearch() {
 
   const handleTakePhoto = () => {
     fileInputRef.current.click();
+  };
+
+  const fetchRecipeImage = async (recipeTitle, cuisine = null) => {
+    try {
+      console.log('Fetching image for:', recipeTitle);
+      
+      // First, try to find an exact match
+      const exactResponse = await fetch(
+        `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(recipeTitle)}&number=1&addRecipeInformation=false`
+      );
+      
+      if (!exactResponse.ok) {
+        console.error('Spoonacular API error:', exactResponse.status);
+        return null;
+      }
+      
+      const exactData = await exactResponse.json();
+      
+      if (exactData.results && exactData.results.length > 0) {
+        const imageUrl = exactData.results[0].image;
+        // Test if the image loads
+        if (await testImageUrl(imageUrl)) {
+          return imageUrl;
+        }
+      }
+      
+      // If no exact match, try with cuisine filter
+      if (cuisine) {
+        const cuisineResponse = await fetch(
+          `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(recipeTitle)}&cuisine=${encodeURIComponent(cuisine)}&number=1&addRecipeInformation=false`
+        );
+        
+        if (cuisineResponse.ok) {
+          const cuisineData = await cuisineResponse.json();
+          
+          if (cuisineData.results && cuisineData.results.length > 0) {
+            const imageUrl = cuisineData.results[0].image;
+            if (await testImageUrl(imageUrl)) {
+              return imageUrl;
+            }
+          }
+        }
+      }
+      
+      // Extract main ingredients and try with those
+      const words = recipeTitle.toLowerCase().split(' ');
+      const commonIngredients = ['chicken', 'beef', 'pasta', 'rice', 'fish', 'vegetables', 'salad', 'soup', 'cake', 'bread', 'pizza'];
+      
+      for (const ingredient of commonIngredients) {
+        if (words.includes(ingredient)) {
+          const ingredientResponse = await fetch(
+            `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(ingredient)}&number=1&addRecipeInformation=false`
+          );
+          
+          if (ingredientResponse.ok) {
+            const ingredientData = await ingredientResponse.json();
+            
+            if (ingredientData.results && ingredientData.results.length > 0) {
+              const imageUrl = ingredientData.results[0].image;
+              if (await testImageUrl(imageUrl)) {
+                return imageUrl;
+              }
+            }
+          }
+        }
+      }
+      
+      // Final fallback - get a random food image
+      console.log('Trying random food image as fallback');
+      const randomResponse = await fetch(
+        `https://api.spoonacular.com/recipes/random?apiKey=${SPOONACULAR_API_KEY}&number=1`
+      );
+      const randomData = await randomResponse.json();
+      console.log('Random food data:', randomData);
+      
+      if (randomData.recipes && randomData.recipes.length > 0) {
+        console.log('Found random food image:', randomData.recipes[0].image);
+        return randomData.recipes[0].image;
+      }
+      
+      console.log('No image found, returning null');
+      return null;
+    } catch (error) {
+      console.error('Error fetching recipe image:', error);
+      return null;
+    }
   };
 
   const generateRecipe = async () => {
@@ -158,12 +283,19 @@ Format your response as a JSON object like this:
       }
       
       if (recipe && recipe.title) {
+        // Fetch image from Spoonacular
+        const recipeImage = await fetchRecipeImage(recipe.title, recipe.cuisine);
+        
+        // Add the image to the recipe
+        recipe.imageUrl = recipeImage || '/placeholder-food.jpg';
+        
         // Add search to history
         if (searchText.trim()) {
           setSearchHistory(prev => [searchText.trim(), ...prev.filter(item => item !== searchText.trim())].slice(0, 5));
         }
         
         setRecipeDetails(recipe);
+        setShowRecipeCard(true);
         showToast("Recipe generated successfully!", "success");
       } else {
         throw new Error("Invalid recipe format");
@@ -198,305 +330,141 @@ Format your response as a JSON object like this:
         isAIGenerated: true,
         aiData: recipeDetails
       };
-      
+
       await toggleSavedRecipe(recipeToSave.id);
       showToast('Recipe saved successfully!', 'success');
     } catch (error) {
+      console.error('Error saving recipe:', error);
       showToast('Failed to save recipe', 'error');
     }
   };
 
-  const isRecipeSaved = savedRecipes.some(r => r.id === `ai-${Date.now()}`);
+  const isSaved = savedRecipes.some(r => r.id === recipeDetails?.id);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-[#11221c] text-white">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <button 
-            onClick={() => navigate('/dashboard')} 
-            className="flex items-center text-gray-600 hover:text-blue-600 mb-4 transition-colors"
-          >
-            <FiArrowLeft className="mr-2" /> Back to Dashboard
-          </button>
-          
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">AI Recipe Search</h1>
-            <p className="text-gray-600">Discover recipes with AI-powered search and image analysis</p>
+        <div className="flex flex-wrap justify-between gap-3 p-4 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4">
+                <FiZap className="w-4 h-4 text-[#0b9766]" />
+              </div>
+              <h1 className="text-white text-3xl font-bold leading-tight tracking-[-0.015em]">
+                Generate Recipes with AI
+              </h1>
+            </div>
           </div>
         </div>
 
+        {/* Search Input */}
+        <div className="flex max-w-2xl flex-wrap items-end gap-4 px-4 py-3 mb-6">
+          <label className="flex flex-col min-w-40 flex-1">
+            <textarea
+              placeholder="Enter your recipe prompt here"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#326755] bg-[#19342a] focus:border-[#0b9766] min-h-36 placeholder:text-[#91cab6] p-[15px] text-base font-normal leading-normal"
+            />
+          </label>
+        </div>
+
+        {/* Upload Image Button */}
+        <div className="flex px-4 py-3 justify-start mb-6">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#23483b] text-white gap-2 pl-4 text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#326755] transition-colors"
+          >
+            <FiImage className="w-5 h-5" />
+            <span className="truncate">Upload Image</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+        </div>
+
+        {/* Image Preview */}
+        {imagePreview && (
+          <div className="px-4 py-3 mb-6">
+            <div className="relative inline-block">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-32 h-32 object-cover rounded-lg border border-[#326755]"
+              />
+              <button
+                onClick={() => setImagePreview(null)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Generate Button */}
+        <div className="flex px-4 py-3 justify-start mb-8">
+          <button
+            onClick={generateRecipe}
+            disabled={loading}
+            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-6 bg-[#0b9766] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#059669] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Generating...</span>
+              </div>
+            ) : (
+              <span>Generate Recipes</span>
+            )}
+          </button>
+        </div>
+
+        {/* Generated Recipe Card */}
+        {showRecipeCard && recipeDetails && (
+          <AIRecipeCard 
+            recipe={recipeDetails} 
+            onClose={() => setShowRecipeCard(false)} 
+          />
+        )}
+
+        {/* Simple Recipe Preview (optional) */}
+        {recipeDetails && !showRecipeCard && (
+          <div className="mt-8 p-4">
+            <div className="bg-[#19342a] rounded-lg p-6 border border-[#326755]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white text-xl font-bold">{recipeDetails.title}</h3>
+                <button
+                  onClick={() => setShowRecipeCard(true)}
+                  className="px-4 py-2 bg-[#0b9766] text-white rounded-lg hover:bg-[#059669] transition-colors"
+                >
+                  View Full Recipe
+                </button>
+              </div>
+              <p className="text-[#91cab6]">{recipeDetails.description}</p>
+            </div>
+          </div>
+        )}
+
         {/* Search History */}
         {searchHistory.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Searches</h3>
+          <div className="mt-8 p-4">
+            <h3 className="text-white text-lg font-bold mb-4">Recent Searches</h3>
             <div className="flex flex-wrap gap-2">
               {searchHistory.map((search, index) => (
                 <button
                   key={index}
                   onClick={() => setSearchText(search)}
-                  className="px-3 py-1 bg-white rounded-full text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                  className="px-3 py-1 bg-[#23483b] text-[#91cab6] rounded-full text-sm hover:bg-[#326755] transition-colors"
                 >
                   {search}
                 </button>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Search Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-          {/* Search Input */}
-          <div className="relative mb-6">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <FiSearch className="text-gray-400 text-xl" />
-            </div>
-            <input
-              type="text"
-              placeholder="Describe what you want to cook... (e.g., 'spicy chicken pasta', 'vegetarian lasagna')"
-              className="w-full pl-12 pr-4 py-4 rounded-xl border-2 border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm text-lg transition-all"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && generateRecipe()}
-            />
-          </div>
-
-          {/* Image Upload */}
-          <div className="mb-6">
-            <label className="flex flex-col items-center justify-center w-full h-80 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-              {imagePreview ? (
-                <div className="relative w-full h-full">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-xl" />
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setImagePreview(null);
-                    }}
-                    className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <FiUpload className="w-16 h-16 mb-4 text-gray-400" />
-                  <p className="mb-2 text-lg text-gray-500">
-                    <span className="font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-sm text-gray-500">Upload a photo of ingredients or a dish</p>
-                </div>
-              )}
-              <input 
-                ref={fileInputRef}
-                type="file" 
-                className="hidden" 
-                accept="image/*"
-                onChange={handleImageUpload}
-              />
-            </label>
-            <div className="flex justify-center mt-4">
-              <button 
-                onClick={handleTakePhoto}
-                className="flex items-center gap-2 px-6 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <FiCamera className="text-gray-600" />
-                <span>Take Photo</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Generate Button */}
-          <button
-            onClick={generateRecipe}
-            disabled={loading || (!searchText && !imagePreview)}
-            className={`w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-lg flex items-center justify-center transition-all ${
-              (loading || (!searchText && !imagePreview)) 
-                ? 'opacity-75 cursor-not-allowed' 
-                : 'hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg transform hover:scale-[1.02]'
-            }`}
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Generating Recipe...
-              </>
-            ) : (
-              <>
-                <FiSearch className="mr-2" />
-                Generate Recipe
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Recipe Results */}
-        {recipeDetails && (
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Recipe Header */}
-            <div className="relative">
-              <img 
-                src={recipeDetails.imageUrl || '/placeholder-food.jpg'} 
-                alt={recipeDetails.title}
-                className="w-full h-96 object-cover"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = '/placeholder-food.jpg';
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <h2 className="text-4xl font-bold mb-2">{recipeDetails.title}</h2>
-                    <p className="text-xl opacity-90">{recipeDetails.description}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveRecipe}
-                      className={`p-3 rounded-full transition-colors ${
-                        isRecipeSaved 
-                          ? 'bg-red-500 hover:bg-red-600' 
-                          : 'bg-white/20 hover:bg-white/30'
-                      }`}
-                    >
-                      <FiSave className={isRecipeSaved ? 'fill-current' : ''} />
-                    </button>
-                    <button className="p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors">
-                      <FiShare2 />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recipe Content */}
-            <div className="p-8">
-              {/* Metadata */}
-              <div className="flex flex-wrap gap-6 mb-8">
-                <div className="flex items-center text-gray-600">
-                  <FiClock className="mr-2" />
-                  <span className="font-medium">Prep:</span> {recipeDetails.prepTime}
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <FiClock className="mr-2" />
-                  <span className="font-medium">Cook:</span> {recipeDetails.cookTime}
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <FiUsers className="mr-2" />
-                  <span className="font-medium">Servings:</span> {recipeDetails.servings}
-                </div>
-                {recipeDetails.difficulty && (
-                  <div className="flex items-center text-gray-600">
-                    <FiStar className="mr-2" />
-                    <span className="font-medium">Difficulty:</span> {recipeDetails.difficulty}
-                  </div>
-                )}
-                {recipeDetails.cuisine && (
-                  <div className="flex items-center text-gray-600">
-                    <span className="font-medium">Cuisine:</span> {recipeDetails.cuisine}
-                  </div>
-                )}
-              </div>
-
-              {/* Nutrition */}
-              {recipeDetails.nutrition && (
-                <div className="mb-8">
-                  <h3 className="text-2xl font-bold mb-4">Nutrition</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-blue-50 p-4 rounded-xl text-center">
-                      <p className="text-sm text-blue-600 font-medium">Calories</p>
-                      <p className="text-2xl font-bold text-blue-800">{recipeDetails.nutrition.calories}</p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-xl text-center">
-                      <p className="text-sm text-green-600 font-medium">Protein</p>
-                      <p className="text-2xl font-bold text-green-800">{recipeDetails.nutrition.protein}</p>
-                    </div>
-                    <div className="bg-yellow-50 p-4 rounded-xl text-center">
-                      <p className="text-sm text-yellow-600 font-medium">Carbs</p>
-                      <p className="text-2xl font-bold text-yellow-800">{recipeDetails.nutrition.carbs}</p>
-                    </div>
-                    <div className="bg-red-50 p-4 rounded-xl text-center">
-                      <p className="text-sm text-red-600 font-medium">Fat</p>
-                      <p className="text-2xl font-bold text-red-800">{recipeDetails.nutrition.fat}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Ingredients and Instructions */}
-              <div className="grid lg:grid-cols-2 gap-8 mb-8">
-                <div>
-                  <h3 className="text-2xl font-bold mb-4">Ingredients</h3>
-                  <ul className="space-y-3">
-                    {recipeDetails.ingredients.map((ingredient, i) => (
-                      <li key={i} className="flex items-start p-3 bg-gray-50 rounded-lg">
-                        <span className="inline-block w-3 h-3 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                        <span className="text-gray-700">{ingredient}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div>
-                  <h3 className="text-2xl font-bold mb-4">Instructions</h3>
-                  <ol className="space-y-4">
-                    {recipeDetails.instructions.map((step, i) => (
-                      <li key={i} className="flex p-4 bg-gray-50 rounded-lg">
-                        <span className="font-bold text-blue-600 mr-4 text-xl min-w-[2rem]">{i + 1}</span>
-                        <span className="text-gray-700 leading-relaxed">{step}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </div>
-
-              {/* YouTube Videos */}
-              {recipeDetails.youtubeVideos && recipeDetails.youtubeVideos.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-2xl font-bold mb-4 flex items-center">
-                    <FiYoutube className="mr-2 text-red-500" />
-                    Video Guides
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {recipeDetails.youtubeVideos.map((video, index) => (
-                      <a
-                        key={index}
-                        href={video.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex-shrink-0 relative">
-                          <img 
-                            src={video.thumbnail} 
-                            alt={video.title}
-                            className="w-32 h-20 object-cover rounded-lg"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="bg-red-500 text-white p-2 rounded-full">
-                              <FiYoutube className="text-lg" />
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-medium line-clamp-2 text-gray-800">{video.title}</h4>
-                          <p className="text-sm text-gray-500 mt-1">Watch on YouTube</p>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* AI Generated Badge */}
-              <div className="text-center p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl">
-                <p className="text-sm text-gray-600">
-                  🤖 This recipe was generated by AI for your convenience
-                </p>
-              </div>
             </div>
           </div>
         )}

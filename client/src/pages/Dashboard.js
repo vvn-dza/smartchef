@@ -1,128 +1,277 @@
 // src/pages/Dashboard.js
-import { useState } from 'react';
-import { useRecipes } from '../context/RecipesContext';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { FiArrowRight, FiX } from 'react-icons/fi';
+import { db } from '../firebaseConfig';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import RecipeCard from '../components/RecipeCard';
-import RecipeCardSkeleton from '../components/RecipeCardSkeleton';
-import IngredientCategoryFilter from '../components/IngredientCategoryFilter';
-import { FiFilter, FiArrowRight } from 'react-icons/fi';
+import AISearch from './AISearch';
+import { useNavigate } from 'react-router-dom';
+
+const SPOONACULAR_API_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
 
 export default function Dashboard() {
-  const {
-    recipes,
-    isLoading,
-    selectedIngredients,
-    setSelectedIngredients
-  } = useRecipes();
+  const [search, setSearch] = useState('');
+  const [showAISearch, setShowAISearch] = useState(false);
+  const [aiQuery, setAIQuery] = useState('');
+  const [quickRecipes, setQuickRecipes] = useState([]);
+  const [showRecipeCard, setShowRecipeCard] = useState(false);
+  const [featuredRecipe, setFeaturedRecipe] = useState(null);
+  const [dailyTip, setDailyTip] = useState('');
+  const [seasonalIngredient, setSeasonalIngredient] = useState('');
+  const [isLoadingContent, setIsLoadingContent] = useState(true);
+  const navigate = useNavigate();
+  const carouselRef = useRef(null);
 
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Fetch quick recipes for the carousel
+  useEffect(() => {
+    const fetchRandomRecipes = async () => {
+      const q = query(collection(db, 'recipes'), limit(20));
+      const snapshot = await getDocs(q);
+      let recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  const clearFilters = () => {
-    setSelectedIngredients([]);
+      // Shuffle the array
+      for (let i = recipes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [recipes[i], recipes[j]] = [recipes[j], recipes[i]];
+      }
+
+      setQuickRecipes(recipes.slice(0, 7));
+    };
+    fetchRandomRecipes();
+  }, []);
+
+  // Carousel auto-scroll
+  useEffect(() => {
+    if (!carouselRef.current) return;
+    const interval = setInterval(() => {
+      const container = carouselRef.current;
+      const card = container.querySelector('div.snap-center');
+      if (card) {
+        container.scrollBy({ left: card.offsetWidth + 16, behavior: 'smooth' });
+        if (container.scrollLeft + container.offsetWidth >= container.scrollWidth) {
+          setTimeout(() => {
+            container.scrollTo({ left: 0, behavior: 'smooth' });
+          }, 500);
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [quickRecipes]);
+
+  // Fetch featured recipe
+  useEffect(() => {
+    const fetchRandomFeatured = async () => {
+      const q = query(collection(db, 'recipes'), limit(20));
+      const snapshot = await getDocs(q);
+      const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (recipes.length > 0) {
+        const random = recipes[Math.floor(Math.random() * recipes.length)];
+        setFeaturedRecipe(random);
+      }
+    };
+    fetchRandomFeatured();
+  }, []);
+
+  // Fetch daily content from API
+  useEffect(() => {
+    const fetchDailyContent = async () => {
+      setIsLoadingContent(true);
+      try {
+        // Get food trivia for cooking tips
+        const triviaResponse = await fetch(
+          `https://api.spoonacular.com/food/trivia/random?apiKey=${SPOONACULAR_API_KEY}`
+        );
+        const triviaData = await triviaResponse.json();
+        
+        const cookingTip = triviaData.text || "Always taste your food while cooking!";
+        
+        // Get seasonal ingredient based on current month
+        const currentMonth = new Date().getMonth();
+        let seasonalQuery = '';
+        
+        if (currentMonth >= 2 && currentMonth <= 5) {
+          seasonalQuery = 'mango';
+        } else if (currentMonth >= 6 && currentMonth <= 9) {
+          seasonalQuery = 'spinach';
+        } else if (currentMonth >= 10 && currentMonth <= 11) {
+          seasonalQuery = 'pumpkin';
+        } else {
+          seasonalQuery = 'orange';
+        }
+        
+        const ingredientResponse = await fetch(
+          `https://api.spoonacular.com/food/ingredients/search?apiKey=${SPOONACULAR_API_KEY}&query=${seasonalQuery}&number=1`
+        );
+        const ingredientData = await ingredientResponse.json();
+        
+        let seasonalIngredient = "Fresh seasonal vegetables are perfect for healthy cooking.";
+        if (ingredientData.results && ingredientData.results.length > 0) {
+          const ingredient = ingredientData.results[0];
+          seasonalIngredient = `${ingredient.name}: Perfect for seasonal cooking and packed with nutrients.`;
+        }
+        
+        setDailyTip(cookingTip);
+        setSeasonalIngredient(seasonalIngredient);
+        
+      } catch (error) {
+        console.error('Error fetching daily content:', error);
+        setDailyTip("Always taste your food while cooking - it's the best way to adjust seasoning!");
+        setSeasonalIngredient("Fresh herbs can transform a simple dish into something special.");
+      } finally {
+        setIsLoadingContent(false);
+      }
+    };
+    
+    fetchDailyContent();
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (search.trim()) {
+      navigate(`/ai-search?query=${encodeURIComponent(search.trim())}`);
+    }
+  };
+
+  const handleRecipeClick = (recipe) => {
+    navigate(`/search?query=${encodeURIComponent(recipe.title)}`);
+  };
+
+  const handleCloseAISearch = () => {
+    setShowAISearch(false);
+    setAIQuery('');
+  };
+
+  const handleCloseRecipeCard = () => {
+    setShowRecipeCard(false);
+    if (featuredRecipe) {
+      navigate(`/search?query=${encodeURIComponent(featuredRecipe.title)}`);
+    }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Mobile Filter Button */}
-        <button
-          onClick={() => setMobileFiltersOpen(true)}
-          className="lg:hidden flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-3 px-5 rounded-lg mb-4 transition-colors"
-        >
-          <FiFilter size={18} /> Filter Recipes
-        </button>
-
-        {/* Filter Sidebar */}
-        <div
-          className={`lg:col-span-1 ${
-            mobileFiltersOpen ? 'fixed inset-0 z-50 bg-white p-6 overflow-y-auto' : 'hidden lg:block'
-          }`}
-        >
-          {mobileFiltersOpen && (
+    <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      {/* Search Bar */}
+      <div className="mb-6 sm:mb-8 lg:mb-10">
+        <form onSubmit={handleSearch} className="w-full">
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="What do you want to cook today?"
+              className="flex-1 w-full px-4 py-3 sm:py-2 rounded-lg border border-[#326755] bg-[#19342a] text-white placeholder-[#91cab6] focus:outline-none focus:ring-2 focus:ring-[#0b9766] text-base"
+            />
             <button
-              onClick={() => setMobileFiltersOpen(false)}
-              className="lg:hidden absolute top-4 right-4 text-gray-500 hover:text-gray-700 p-2"
-              aria-label="Close filters"
+              type="submit"
+              className="w-full sm:w-auto px-6 py-3 sm:py-2 rounded-lg bg-[#0b9766] text-white font-semibold hover:bg-[#059669] transition-colors text-base"
             >
-              ✕
+              Search
             </button>
-          )}
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <FiFilter /> Filter Recipes
-          </h2>
-          <IngredientCategoryFilter
-            selected={selectedIngredients}
-            onChange={setSelectedIngredients}
-          />
+          </div>
+        </form>
+      </div>
+
+      {/* AI Search Modal/Overlay */}
+      {showAISearch && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#23483b] rounded-lg p-4 sm:p-6 max-w-2xl w-full relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={handleCloseAISearch}
+              className="absolute top-2 right-2 text-[#91cab6] hover:text-white p-2 z-10"
+            >
+              <FiX size={20} />
+            </button>
+            <AISearch initialQuery={aiQuery} />
+          </div>
         </div>
+      )}
 
-        {/* Recipe Results */}
-        <div className="lg:col-span-3">
-          {selectedIngredients.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl p-8 text-center max-w-2xl mx-auto">
-              <img
-                src="/images/empty-state.png"
-                alt="No ingredients selected"
-                className="mx-auto h-48 w-48 md:h-56 md:w-56 mb-6 opacity-90 object-contain"
-                loading="lazy"
-              />
-              <h3 className="text-xl md:text-2xl font-medium text-gray-700 mb-3">
-                Let's find your perfect recipe!
-              </h3>
-              <p className="text-gray-500 mb-6">
-                Select ingredients from the categories to discover matching recipes
-              </p>
-            </div>
-          ) : isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <RecipeCardSkeleton key={`skeleton-${i}`} />
-              ))}
-            </div>
+      {/* Carousel Section */}
+      <div className="mb-8 sm:mb-10">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
+        <div 
+          ref={carouselRef} 
+          className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {quickRecipes.length === 0 ? (
+            <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
           ) : (
-            <>
-              <div className="mb-6 flex justify-between items-center">
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    {recipes.length} {recipes.length === 1 ? 'Recipe' : 'Recipes'} Found
-                  </h2>
-                  <p className="text-gray-600">Matching: {selectedIngredients.join(', ')}</p>
-                </div>
-                <button
-                  onClick={clearFilters}
-                  className="text-blue-500 hover:text-blue-700 text-sm"
-                >
-                  Clear Filters
-                </button>
+            quickRecipes.map(recipe => (
+              <div
+                key={recipe.id}
+                className="min-w-[250px] sm:min-w-[280px] md:min-w-[320px] lg:min-w-[350px] max-w-[250px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[350px] cursor-pointer snap-center flex-shrink-0"
+                onClick={() => handleRecipeClick(recipe)}
+              >
+                <RecipeCard recipe={recipe} />
               </div>
-
-              {recipes.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {recipes.map(recipe => (
-                    <RecipeCard key={recipe.id} recipe={recipe} />
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-xl p-8 text-center max-w-md mx-auto">
-                  <img
-                    src="/images/not-found.png"
-                    alt="No recipes found"
-                    className="mx-auto h-40 mb-4 opacity-80"
-                    loading="lazy"
-                  />
-                  <h3 className="text-xl font-medium text-gray-700 mb-2">No matches found</h3>
-                  <p className="text-gray-500 mb-4">Try different ingredient combinations</p>
-                  <button
-                    onClick={clearFilters}
-                    className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-5 rounded-lg transition-colors inline-flex items-center gap-1"
-                  >
-                    Clear Filters <FiArrowRight className="mt-0.5" />
-                  </button>
-                </div>
-              )}
-            </>
+            ))
           )}
         </div>
       </div>
+
+      {/* Browse Recipes CTA */}
+      <div className="px-2 sm:px-4 py-6 mb-8 sm:mb-10">
+        <div className="bg-[#23483b] rounded-xl p-4 sm:p-6 border border-[#326755]">
+          <h2 className="text-white text-base sm:text-lg md:text-xl font-bold mb-3">Discover More Recipes</h2>
+          <p className="text-[#91cab6] mb-4 text-sm sm:text-base leading-relaxed">
+            Browse our collection of recipes by selecting your favorite ingredients
+          </p>
+          <Link
+            to="/search"
+            className="inline-flex items-center gap-2 bg-[#0b9766] hover:bg-[#059669] text-white py-2 px-4 rounded-lg transition-colors text-sm sm:text-base"
+          >
+            Browse Recipes <FiArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Today's Inspiration */}
+      <div className="px-2 sm:px-4">
+        <h2 className="text-white text-base sm:text-lg md:text-xl lg:text-[22px] font-bold leading-tight tracking-[-0.015em] pb-3 pt-2 mb-4">Today's Inspiration</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-[#23483b] rounded-xl p-4 sm:p-6 border border-[#326755]">
+            <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">💡 Cooking Tip</h3>
+            {isLoadingContent ? (
+              <div className="animate-pulse">
+                <div className="h-4 bg-[#326755] rounded mb-2"></div>
+                <div className="h-4 bg-[#326755] rounded w-3/4"></div>
+              </div>
+            ) : (
+              <p className="text-[#91cab6] text-sm sm:text-base leading-relaxed">{dailyTip}</p>
+            )}
+          </div>
+          
+          <div className="bg-[#23483b] rounded-xl p-4 sm:p-6 border border-[#326755]">
+            <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">🌱 Seasonal Ingredient</h3>
+            {isLoadingContent ? (
+              <div className="animate-pulse">
+                <div className="h-4 bg-[#326755] rounded mb-2"></div>
+                <div className="h-4 bg-[#326755] rounded w-2/3"></div>
+              </div>
+            ) : (
+              <p className="text-[#91cab6] text-sm sm:text-base leading-relaxed">{seasonalIngredient}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Recipe Card Modal */}
+      {showRecipeCard && featuredRecipe && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#23483b] rounded-lg p-4 sm:p-6 max-w-2xl w-full relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={handleCloseRecipeCard}
+              className="absolute top-2 right-2 text-[#91cab6] hover:text-white transition-colors p-2 z-10"
+            >
+              <FiX size={20} />
+            </button>
+            <RecipeCard recipe={featuredRecipe} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

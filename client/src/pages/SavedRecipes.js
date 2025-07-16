@@ -8,7 +8,9 @@ import {
   FiArrowRight, 
   FiCheck, 
   FiArrowLeft,
-  FiX
+  FiX,
+  FiFilter,
+  FiSearch
 } from 'react-icons/fi';
 import { auth } from '../firebaseConfig';
 

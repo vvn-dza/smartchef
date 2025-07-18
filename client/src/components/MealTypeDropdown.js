@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { FiChevronDown, FiCheck } from 'react-icons/fi';
-import filterCategories from '../data/filterCategories.json';
+import { useRecipes } from '../context/RecipesContext';
 
 export default function MealTypeDropdown({ selectedMealType, setSelectedMealType }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,8 +17,13 @@ export default function MealTypeDropdown({ selectedMealType, setSelectedMealType
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const mealTypes = filterCategories.mealTypes;
+  const { filterCategories } = useRecipes();
+  const mealTypes = filterCategories && filterCategories.mealTypes ? filterCategories.mealTypes : [];
   const selectedOption = mealTypes.find(type => type.value === selectedMealType) || mealTypes[0];
+
+  if (!selectedOption) {
+    return null; // or you can return a loading spinner or placeholder here
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -32,7 +37,7 @@ export default function MealTypeDropdown({ selectedMealType, setSelectedMealType
 
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-[#19342a] border border-[#326755] rounded-lg shadow-lg z-10">
-          {mealTypes.map((type) => (
+          {(mealTypes || []).map((type) => (
             <button
               key={type.value}
               onClick={() => {

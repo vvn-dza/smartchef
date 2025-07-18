@@ -9,8 +9,22 @@ const FilterTabs = () => {
     setSelectedDietaryType,
     selectedCourseType,
     setSelectedCourseType,
-    filterCategories
+    filterCategories,
+    isLoading,
+    error
   } = useRecipes();
+
+  if (isLoading) {
+    return <div className="text-center py-8">Loading filters...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-8 text-red-500">{error}</div>;
+  }
+
+  if (!filterCategories) {
+    return <div className="text-center py-8">No filters available.</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -18,7 +32,7 @@ const FilterTabs = () => {
       <div>
         <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wide">Meal Type</h3>
         <div className="flex gap-2 flex-wrap">
-          {filterCategories.mealTypes.map((mealType) => (
+          {(filterCategories?.mealTypes || []).map((mealType) => (
             <button
               key={mealType.value}
               onClick={() => setSelectedMealType(mealType.value)}
@@ -38,7 +52,7 @@ const FilterTabs = () => {
       <div>
         <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wide">Dietary</h3>
         <div className="flex gap-2 flex-wrap">
-          {filterCategories.dietaryTypes.map((dietaryType) => (
+          {(filterCategories?.dietaryTypes || []).map((dietaryType) => (
             <button
               key={dietaryType.value}
               onClick={() => setSelectedDietaryType(dietaryType.value)}
@@ -58,7 +72,7 @@ const FilterTabs = () => {
       <div>
         <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wide">Course</h3>
         <div className="flex gap-2 flex-wrap">
-          {filterCategories.courseTypes.map((courseType) => (
+          {(filterCategories?.courseTypes || []).map((courseType) => (
             <button
               key={courseType.value}
               onClick={() => setSelectedCourseType(courseType.value)}

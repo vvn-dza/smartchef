@@ -6,7 +6,6 @@ import RecipeCardSkeleton from '../components/RecipeCardSkeleton';
 import IngredientCategoryFilter from '../components/IngredientCategoryFilter';
 import MealTypeDropdown from '../components/MealTypeDropdown';
 import { FiFilter, FiSearch, FiChevronLeft, FiChevronRight, FiX } from 'react-icons/fi';
-import filterCategories from '../data/filterCategories.json';
 import { useLocation } from 'react-router-dom';
 
 export default function RecipeSearch() {
@@ -18,14 +17,15 @@ export default function RecipeSearch() {
     selectedDietaryType,
     setSelectedDietaryType,
     requestRecipesFetch,
-    clearAllFilters
+    clearAllFilters,
+    filterCategories
   } = useRecipes();
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [recipesPerPage] = useState(9);
-  const dietaryOptions = filterCategories.dietaryTypes;
+  const dietaryOptions = filterCategories ? filterCategories.dietaryTypes : [];
 
   const location = useLocation();
   const [searchText, setSearchText] = useState('');
@@ -185,7 +185,7 @@ export default function RecipeSearch() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-[#91cab6] mb-2">Dietary:</label>
               <div className="flex flex-wrap gap-2">
-                {dietaryOptions.map((option) => (
+                {(dietaryOptions || []).map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleDietaryChange(option.value)}
@@ -227,7 +227,7 @@ export default function RecipeSearch() {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-300">Dietary:</span>
               <div className="flex flex-wrap gap-2">
-                {dietaryOptions.map((option) => (
+                {(dietaryOptions || []).map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleDietaryChange(option.value)}

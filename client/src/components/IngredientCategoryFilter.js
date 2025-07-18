@@ -1,13 +1,26 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 //import { Disclosure } from '@headlessui/react';
 import { FiChevronDown, FiChevronRight, FiX, FiSearch } from 'react-icons/fi';
-import ingredientData from '../data/ingredientCategories.json';
+import { fetchIngredientCategories } from '../api/recipeService';
 import { useRecipes } from '../context/RecipesContext';
 
 const IngredientCategoryFilter = () => {
   const { selectedIngredients, setSelectedIngredients } = useRecipes();
   const [expandedCategories, setExpandedCategories] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await fetchIngredientCategories();
+        setCategories(data);
+      } catch (err) {
+        setCategories([]);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Updated: Handle filter toggle with useCallback to prevent infinite loops
   const handleToggle = useCallback((ingredient) => {
@@ -75,14 +88,17 @@ const IngredientCategoryFilter = () => {
       )}
 
       {/* Categories */}
-      {ingredientData.categories.map(category => {
+      {categories.map(category => {
         const isExpanded = expandedCategories[category.name] || false;
+        // Use 'ingredients' or 'items', default to []
+        const allIngredients = category.ingredients || category.items || [];
         const visibleIngredients = isExpanded 
-          ? category.ingredients 
-          : category.ingredients.slice(0, 4);
-        
+          ? allIngredients 
+          : allIngredients.slice(0, 4);
+
+        // Only filter string ingredients
         const filteredIngredients = visibleIngredients.filter(ingredient =>
-          ingredient.toLowerCase().includes(searchTerm.toLowerCase())
+          typeof ingredient === 'string' && ingredient.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
         if (filteredIngredients.length === 0) return null;

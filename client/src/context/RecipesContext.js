@@ -6,10 +6,9 @@ import {
   deleteDoc,
   setDoc,
   collection,
-  getDocs,
   onSnapshot
 } from 'firebase/firestore';
-import filterCategories from '../data/filterCategories.json';
+import { fetchAllRecipes, fetchFilterCategories, fetchSavedRecipes, saveRecipeForUser, removeSavedRecipeForUser } from '../api/recipeService';
 
 const RecipesContext = createContext();
 
@@ -28,6 +27,8 @@ export function RecipesProvider({ children }) {
   const [lastFetched, setLastFetched] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [shouldFetchRecipes, setShouldFetchRecipes] = useState(false);
+  const [filterCategories, setFilterCategories] = useState(null);
+  const [filterCategoriesLoading, setFilterCategoriesLoading] = useState(true);
 
   const fetchRecipes = useCallback(async () => {
     // Only fetch if explicitly requested and not recently fetched
@@ -37,16 +38,7 @@ export function RecipesProvider({ children }) {
 
     try {
       setIsLoading(true);
-      const snapshot = await getDocs(collection(db, 'recipes'));
-      const recipesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        ingredients: doc.data().ingredients?.map(ing => ({
-          name: ing.name?.toLowerCase().trim() || '',
-          amount: ing.amount || '',
-          original: ing.original || ''
-        })) || []
-      }));
+      const recipesData = await fetchAllRecipes();
       setAllRecipes(recipesData);
       setLastFetched(Date.now());
       setIsInitialized(true);
@@ -71,24 +63,32 @@ export function RecipesProvider({ children }) {
       setSavedRecipes([]);
       return;
     }
-
-    const unsubscribe = onSnapshot(
-      collection(db, 'users', user.uid, 'savedRecipes'),
-      (snapshot) => {
-        const savedRecipesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setSavedRecipes(savedRecipesData);
-      },
-      (err) => {
-        console.error("Error listening to saved recipes:", err);
-        setError("Failed to load saved recipes. Please refresh.");
+    let isMounted = true;
+    const fetchSaved = async () => {
+      try {
+        const saved = await fetchSavedRecipes(user.uid);
+        if (isMounted) setSavedRecipes(saved);
+      } catch (err) {
+        if (isMounted) setSavedRecipes([]);
       }
-    );
-
-    return unsubscribe;
+    };
+    fetchSaved();
+    return () => { isMounted = false; };
   }, [user]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await fetchFilterCategories();
+        // If data is an array, use the first doc (for single doc storage)
+        setFilterCategories(Array.isArray(data) ? data[0] : data);
+      } catch (err) {
+        setFilterCategories(null);
+      }
+      setFilterCategoriesLoading(false);
+    };
+    fetchCategories();
+  }, []);
 
   // Only fetch recipes when explicitly requested
   useEffect(() => {
@@ -97,44 +97,31 @@ export function RecipesProvider({ children }) {
     }
   }, [shouldFetchRecipes, fetchRecipes]);
 
-  const toggleSavedRecipe = async (recipeOrId) => {
+  const toggleSavedRecipe = useCallback(async (recipe) => {
     if (!user) return;
-
     setSaving(true);
     try {
-      const userId = user.uid;
-      // Accept either a recipe object or an ID
-      const recipeId = typeof recipeOrId === 'string' ? recipeOrId : recipeOrId.id;
-      const userSavedRef = doc(db, 'users', userId, 'savedRecipes', recipeId);
-
-      // Try to find in allRecipes, else use the provided object
-      let recipeToSave = allRecipes.find(r => r.id === recipeId);
-      if (!recipeToSave && typeof recipeOrId === 'object') {
-        recipeToSave = recipeOrId;
-      }
-      const isSaved = savedRecipes.some(r => r.id === recipeId);
-
+      const isSaved = savedRecipes.some(r => r.id === recipe.id);
       if (isSaved) {
-        await deleteDoc(userSavedRef);
-      } else if (recipeToSave) {
-        await setDoc(userSavedRef, {
-          ...recipeToSave,
-          savedAt: new Date()
-        });
+        await removeSavedRecipeForUser(user.uid, recipe.id);
+        setSavedRecipes(prev => prev.filter(r => r.id !== recipe.id));
+      } else {
+        await saveRecipeForUser(user.uid, recipe.id, recipe);
+        setSavedRecipes(prev => [...prev, recipe]);
       }
     } catch (err) {
-      console.error("Error toggling saved recipe:", err);
-      setError("Failed to update saved recipes. Please try again.");
-      throw err;
+      // Optionally handle error
     } finally {
       setSaving(false);
     }
-  };
+  }, [user, savedRecipes]);
 
   // Helper function to check if recipe matches meal type
   const matchesMealType = useCallback((recipe, mealType) => {
     if (mealType === 'all') return true;
     
+    if (!filterCategories || !filterCategories.mealTypes) return true;
+
     const mealTypeConfig = filterCategories.mealTypes.find(mt => mt.value === mealType);
     if (!mealTypeConfig || !mealTypeConfig.keywords) return true;
 
@@ -142,12 +129,14 @@ export function RecipesProvider({ children }) {
     return mealTypeConfig.keywords.some(keyword => 
       recipeText.includes(keyword.toLowerCase())
     );
-  }, []);
+  }, [filterCategories]);
 
   // Helper function to check if recipe matches dietary type
   const matchesDietaryType = useCallback((recipe, dietaryType) => {
     if (dietaryType === 'all') return true;
     
+    if (!filterCategories) return true;
+
     const dietaryConfig = filterCategories.dietaryTypes.find(dt => dt.value === dietaryType);
     if (!dietaryConfig) return true;
 
@@ -170,12 +159,14 @@ export function RecipesProvider({ children }) {
     }
     
     return true;
-  }, []);
+  }, [filterCategories]);
 
   // Helper function to check if recipe matches course type
   const matchesCourseType = useCallback((recipe, courseType) => {
     if (courseType === 'all') return true;
     
+    if (!filterCategories || !filterCategories.courseTypes) return true;
+
     const courseConfig = filterCategories.courseTypes.find(ct => ct.value === courseType);
     if (!courseConfig || !courseConfig.keywords) return true;
 
@@ -183,10 +174,10 @@ export function RecipesProvider({ children }) {
     return courseConfig.keywords.some(keyword => 
       recipeText.includes(keyword.toLowerCase())
     );
-  }, []);
+  }, [filterCategories]);
 
   const filteredRecipes = useMemo(() => {
-    let filtered = allRecipes;
+    let filtered = (allRecipes || []);
 
     // Apply meal type filter
     if (selectedMealType !== 'all') {
@@ -206,8 +197,8 @@ export function RecipesProvider({ children }) {
     // Apply ingredient filter
     if (selectedIngredients.length > 0) {
       filtered = filtered.filter(recipe => {
-        const ingredientNames = recipe.ingredients.map(ing =>
-          ing.name.toLowerCase().trim()
+        const ingredientNames = (recipe.ingredients || []).map(ing =>
+          (ing.name || '').toLowerCase().trim()
         );
 
         return selectedIngredients.every(selectedIng =>
@@ -258,7 +249,9 @@ export function RecipesProvider({ children }) {
     saving,
     clearAllFilters,
     requestRecipesFetch,
-    isInitialized
+    isInitialized,
+    filterCategories,
+    filterCategoriesLoading
   };
 
   return (

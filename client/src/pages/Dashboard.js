@@ -7,6 +7,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import RecipeCard from '../components/RecipeCard';
 import AISearch from './AISearch';
 import { useNavigate } from 'react-router-dom';
+import { fetchAllRecipes } from '../api/recipeService';
 
 const SPOONACULAR_API_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
 
@@ -26,17 +27,17 @@ export default function Dashboard() {
   // Fetch quick recipes for the carousel
   useEffect(() => {
     const fetchRandomRecipes = async () => {
-      const q = query(collection(db, 'recipes'), limit(20));
-      const snapshot = await getDocs(q);
-      let recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Shuffle the array
-      for (let i = recipes.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [recipes[i], recipes[j]] = [recipes[j], recipes[i]];
+      try {
+        const recipes = await fetchAllRecipes();
+        // Shuffle the array
+        for (let i = recipes.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [recipes[i], recipes[j]] = [recipes[j], recipes[i]];
+        }
+        setQuickRecipes(recipes.slice(0, 7));
+      } catch (err) {
+        setQuickRecipes([]);
       }
-
-      setQuickRecipes(recipes.slice(0, 7));
     };
     fetchRandomRecipes();
   }, []);
@@ -233,7 +234,7 @@ export default function Dashboard() {
         <h2 className="text-white text-base sm:text-lg md:text-xl lg:text-[22px] font-bold leading-tight tracking-[-0.015em] pb-3 pt-2 mb-4">Today's Inspiration</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-[#23483b] rounded-xl p-4 sm:p-6 border border-[#326755]">
-            <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">💡 Cooking Tip</h3>
+            <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">💡 Fun Facts</h3>
             {isLoadingContent ? (
               <div className="animate-pulse">
                 <div className="h-4 bg-[#326755] rounded mb-2"></div>

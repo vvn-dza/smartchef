@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { fetchIngredientCategories } from '../api/recipeService';
 
 export default function DynamicIngredientFilter({ selected, onChange }) {
   const [categories, setCategories] = useState([]);
@@ -8,11 +9,13 @@ export default function DynamicIngredientFilter({ selected, onChange }) {
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const snapshot = await getDocs(collection(db, 'ingredientCategories'));
-      setCategories(snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })));
+      try {
+        const categories = await fetchIngredientCategories();
+        setCategories(categories);
+      } catch (err) {
+        // Optionally handle error
+        setCategories([]);
+      }
       setLoading(false);
     };
     fetchCategories();

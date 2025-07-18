@@ -91,6 +91,14 @@ app.post('/api/generate-recipe', async (req, res) => {
   }
 });
 
+const recipeRoutes = require('./routes/recipeRoutes');
+app.use('/api/recipes', recipeRoutes);
+const { getIngredientCategories, getFilterCategories } = require('./controllers/recipeController');
+app.get('/api/ingredient-categories', getIngredientCategories);
+app.get('/api/filter-categories', getFilterCategories);
+const authenticateFirebaseToken = require('./middleware/authenticateFirebaseToken');
+app.use('/api/recipes/users', authenticateFirebaseToken);
+
 // Test route
 app.get('/', (req, res) => {
   res.send('SmartChef Server is running');

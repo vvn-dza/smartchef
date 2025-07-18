@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit, FiSave, FiUpload, FiUser, FiMail, FiTrash2, FiX } from 'react-icons/fi';
+import { fetchUserProfile, updateUserProfile, deleteUserProfile } from '../api/recipeService';
 
 export default function Profile() {
   const [userData, setUserData] = useState(null);
@@ -99,20 +100,15 @@ export default function Profile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Update auth profile
-      await updateProfile(auth.currentUser, {
-        displayName: formData.displayName,
-        photoURL: formData.photoURL || null
-      });
-      
-      // Update Firestore
-      await setDoc(doc(db, 'users', auth.currentUser.uid), {
+      // Get ID token
+      const idToken = await auth.currentUser.getIdToken();
+      // Update backend profile
+      await updateUserProfile(auth.currentUser.uid, {
         displayName: formData.displayName,
         photoURL: formData.photoURL || null,
         email: auth.currentUser.email,
         lastUpdated: new Date()
-      }, { merge: true });
-      
+      }, idToken);
       showToast('Profile updated successfully!', 'success');
       setEditMode(false);
     } catch (err) {
@@ -123,18 +119,12 @@ export default function Profile() {
 
   const handleDeleteAccount = async () => {
     try {
-      // Delete profile picture from storage if exists
-      if (auth.currentUser.photoURL) {
-        const storageRef = ref(storage, `profile_pictures/${auth.currentUser.uid}`);
-        await deleteObject(storageRef).catch(() => {});
-      }
-
-      // Delete user data from Firestore
-      await deleteDoc(doc(db, 'users', auth.currentUser.uid));
-
-      // Delete user account
+      // Get ID token
+      const idToken = await auth.currentUser.getIdToken();
+      // Delete user data from backend
+      await deleteUserProfile(auth.currentUser.uid, idToken);
+      // Optionally delete user from Firebase Auth
       await deleteUser(auth.currentUser);
-
       showToast('Account deleted successfully', 'success');
       navigate('/');
     } catch (err) {

@@ -22,6 +22,17 @@ export default function Profile() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (!user) {
+        navigate('/login');
+      }
+      setCheckingAuth(false);
+    });
+    return unsubscribe;
+  }, [navigate]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -55,6 +66,14 @@ export default function Profile() {
 
     fetchUserData();
   }, [navigate, showToast]);
+
+  if (checkingAuth || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+      </div>
+    );
+  }
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -132,12 +151,6 @@ export default function Profile() {
       showToast('Failed to delete account', 'error');
     }
   };
-
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-    </div>
-  );
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 sm:py-10">

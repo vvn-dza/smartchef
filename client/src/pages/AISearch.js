@@ -3,15 +3,12 @@ import { FiSearch, FiCamera, FiUpload, FiArrowLeft, FiClock, FiUsers, FiStar, Fi
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
-import { GoogleGenAI } from '@google/genai';
 import AIRecipeCard from '../components/AIRecipeCard';
 
 console.log("API Key loaded:", !!process.env.REACT_APP_GEMINI_API_KEY);
 console.log("API Key length:", process.env.REACT_APP_GEMINI_API_KEY?.length);
 console.log("YouTube API Key:", process.env.REACT_APP_YOUTUBE_API_KEY ? 'Present' : 'Missing');
 console.log("YouTube API Key length:", process.env.REACT_APP_YOUTUBE_API_KEY?.length);
-
-const SPOONACULAR_API_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
 
 // Helper to test if an image URL is valid and loads
 const testImageUrl = (url) => {
@@ -37,10 +34,6 @@ export default function AISearch() {
   const [showRecipeCard, setShowRecipeCard] = useState(false);
   const location = useLocation();
   const triggeredByUrl = useRef(false);
-
-  const ai = new GoogleGenAI({
-    apiKey: process.env.REACT_APP_GEMINI_API_KEY
-  });
 
   // 1. When the URL changes, set searchText if there's a query param
   useEffect(() => {
@@ -80,82 +73,29 @@ export default function AISearch() {
   const fetchRecipeImage = async (recipeTitle, cuisine = null) => {
     try {
       console.log('Fetching image for:', recipeTitle);
-      
-      // First, try to find an exact match
-      const exactResponse = await fetch(
-        `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(recipeTitle)}&number=1&addRecipeInformation=false`
-      );
-      
-      if (!exactResponse.ok) {
-        console.error('Spoonacular API error:', exactResponse.status);
+      // Use backend proxy endpoint
+      let url = `http://localhost:5000/api/spoonacular/recipe-image?query=${encodeURIComponent(recipeTitle)}`;
+      if (cuisine) {
+        url += `&cuisine=${encodeURIComponent(cuisine)}`;
+      }
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('Spoonacular API error:', response.status);
         return null;
       }
-      
-      const exactData = await exactResponse.json();
-      
-      if (exactData.results && exactData.results.length > 0) {
-        const imageUrl = exactData.results[0].image;
-        // Test if the image loads
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        const imageUrl = data.results[0].image;
         if (await testImageUrl(imageUrl)) {
           return imageUrl;
         }
       }
-      
-      // If no exact match, try with cuisine filter
-      if (cuisine) {
-        const cuisineResponse = await fetch(
-          `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(recipeTitle)}&cuisine=${encodeURIComponent(cuisine)}&number=1&addRecipeInformation=false`
-        );
-        
-        if (cuisineResponse.ok) {
-          const cuisineData = await cuisineResponse.json();
-          
-          if (cuisineData.results && cuisineData.results.length > 0) {
-            const imageUrl = cuisineData.results[0].image;
-            if (await testImageUrl(imageUrl)) {
-              return imageUrl;
-            }
-          }
-        }
-      }
-      
-      // Extract main ingredients and try with those
-      const words = recipeTitle.toLowerCase().split(' ');
-      const commonIngredients = ['chicken', 'beef', 'pasta', 'rice', 'fish', 'vegetables', 'salad', 'soup', 'cake', 'bread', 'pizza'];
-      
-      for (const ingredient of commonIngredients) {
-        if (words.includes(ingredient)) {
-          const ingredientResponse = await fetch(
-            `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(ingredient)}&number=1&addRecipeInformation=false`
-          );
-          
-          if (ingredientResponse.ok) {
-            const ingredientData = await ingredientResponse.json();
-            
-            if (ingredientData.results && ingredientData.results.length > 0) {
-              const imageUrl = ingredientData.results[0].image;
-              if (await testImageUrl(imageUrl)) {
-                return imageUrl;
-              }
-            }
-          }
-        }
-      }
-      
-      // Final fallback - get a random food image
-      console.log('Trying random food image as fallback');
-      const randomResponse = await fetch(
-        `https://api.spoonacular.com/recipes/random?apiKey=${SPOONACULAR_API_KEY}&number=1`
-      );
+      // Fallback: try random food image
+      const randomResponse = await fetch('http://localhost:5000/api/spoonacular/recipe-image?query=food');
       const randomData = await randomResponse.json();
-      console.log('Random food data:', randomData);
-      
-      if (randomData.recipes && randomData.recipes.length > 0) {
-        console.log('Found random food image:', randomData.recipes[0].image);
-        return randomData.recipes[0].image;
+      if (randomData.results && randomData.results.length > 0) {
+        return randomData.results[0].image;
       }
-      
-      console.log('No image found, returning null');
       return null;
     } catch (error) {
       console.error('Error fetching recipe image:', error);
@@ -173,134 +113,20 @@ export default function AISearch() {
     setRecipeDetails(null);
 
     try {
-      let prompt = "";
-      let contents = [];
-
-      if (imagePreview) {
-        prompt = `Analyze this food image and provide a detailed recipe that matches what you see.
-
-If you can identify the dish, provide an authentic recipe for it.
-If you cannot identify a specific dish, suggest a recipe that could be made with the ingredients visible in the image.
-
-Format your response as a JSON object like this:
-{
-  "title": "Recipe Name",
-  "description": "Brief description of the dish",
-  "ingredients": ["ingredient 1", "ingredient 2"],
-  "instructions": ["step 1", "step 2"],
-  "prepTime": "10 mins",
-  "cookTime": "20 mins",
-  "servings": "4",
-  "nutrition": {
-    "calories": "300",
-    "protein": "15g",
-    "carbs": "25g",
-    "fat": "10g"
-  },
-  "difficulty": "Easy",
-  "cuisine": "Italian",
-  "imageUrl": "https://example.com/food-image.jpg"
-}
-
-Make sure to provide a practical recipe that someone could actually cook.`;
-        
-        const base64Data = imagePreview.split(',')[1];
-        contents = [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: base64Data
-                }
-              }
-            ]
-          }
-        ];
-      } else {
-        prompt = `Create a detailed recipe for "${searchText}". 
-
-Format your response as a JSON object like this:
-{
-  "title": "Recipe Name",
-  "description": "Brief description",
-  "ingredients": ["ingredient 1", "ingredient 2"],
-  "instructions": ["step 1", "step 2"],
-  "prepTime": "10 mins",
-  "cookTime": "20 mins",
-  "servings": "4",
-  "nutrition": {
-    "calories": "300",
-    "protein": "15g",
-    "carbs": "25g",
-    "fat": "10g"
-  },
-  "difficulty": "Easy",
-  "cuisine": "Italian",
-  "imageUrl": "https://example.com/food-image.jpg"
-}`;
-
-        contents = [
-          {
-            role: "user",
-            parts: [{ text: prompt }]
-          }
-        ];
-      }
-
-      console.log("Sending prompt:", prompt);
-      console.log("Image preview exists:", !!imagePreview);
-
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: contents,
+      const response = await fetch('http://localhost:5000/api/generate-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          searchText: searchText.trim(),
+          imageData: imagePreview ? imagePreview.split(',')[1] : null
+        })
       });
 
-      const text = response.text;
-      console.log("Raw response:", text);
-      
-      let recipe = null;
-      
-      try {
-        recipe = JSON.parse(text.trim());
-      } catch (e1) {
-        console.log("Direct parse failed, trying to extract JSON...");
-        console.log("Parse error:", e1);
-        
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            recipe = JSON.parse(jsonMatch[0]);
-            console.log("JSON extraction successful");
-          } catch (e2) {
-            console.log("JSON extraction failed:", e2);
-          }
-        } else {
-          console.log("No JSON found in response");
-        }
-      }
-      
-      if (recipe && recipe.title) {
-        // Fetch image from Spoonacular
-        const recipeImage = await fetchRecipeImage(recipe.title, recipe.cuisine);
-        
-        // Add the image to the recipe
-        recipe.imageUrl = recipeImage || '/placeholder-food.jpg';
-        
-        // Add search to history
-        if (searchText.trim()) {
-          setSearchHistory(prev => [searchText.trim(), ...prev.filter(item => item !== searchText.trim())].slice(0, 5));
-        }
-        
-        setRecipeDetails(recipe);
-        setShowRecipeCard(true);
-        showToast("Recipe generated successfully!", "success");
-      } else {
-        throw new Error("Invalid recipe format");
-      }
-
+      if (!response.ok) throw new Error('Failed to generate recipe');
+      const recipe = await response.json();
+      setRecipeDetails(recipe);
+      setShowRecipeCard(true);
+      showToast("Recipe generated successfully!", "success");
     } catch (error) {
       console.error("Error generating recipe:", error);
       showToast("Failed to generate recipe. Please try again.", "error");

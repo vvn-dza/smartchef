@@ -8,8 +8,7 @@ import RecipeCard from '../components/RecipeCard';
 import AISearch from './AISearch';
 import { useNavigate } from 'react-router-dom';
 import { fetchAllRecipes } from '../api/recipeService';
-
-const SPOONACULAR_API_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
+import RecipeCardSkeleton from '../components/RecipeCardSkeleton';
 
 export default function Dashboard() {
   const [search, setSearch] = useState('');
@@ -23,10 +22,13 @@ export default function Dashboard() {
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const navigate = useNavigate();
   const carouselRef = useRef(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [carouselLoading, setCarouselLoading] = useState(true);
 
   // Fetch quick recipes for the carousel
   useEffect(() => {
     const fetchRandomRecipes = async () => {
+      setCarouselLoading(true);
       try {
         const recipes = await fetchAllRecipes();
         // Shuffle the array
@@ -37,10 +39,18 @@ export default function Dashboard() {
         setQuickRecipes(recipes.slice(0, 7));
       } catch (err) {
         setQuickRecipes([]);
+      } finally {
+        setCarouselLoading(false);
       }
     };
     fetchRandomRecipes();
   }, []);
+
+  // Carousel navigation
+  const visibleCards = 3;
+  const maxIndex = Math.max(0, quickRecipes.length - visibleCards);
+  const handlePrev = () => setCarouselIndex(i => Math.max(0, i - 1));
+  const handleNext = () => setCarouselIndex(i => Math.min(maxIndex, i + 1));
 
   // Carousel auto-scroll
   useEffect(() => {
@@ -81,17 +91,12 @@ export default function Dashboard() {
       setIsLoadingContent(true);
       try {
         // Get food trivia for cooking tips
-        const triviaResponse = await fetch(
-          `https://api.spoonacular.com/food/trivia/random?apiKey=${SPOONACULAR_API_KEY}`
-        );
+        const triviaResponse = await fetch('http://localhost:5000/api/spoonacular/trivia');
         const triviaData = await triviaResponse.json();
-        
         const cookingTip = triviaData.text || "Always taste your food while cooking!";
-        
         // Get seasonal ingredient based on current month
         const currentMonth = new Date().getMonth();
         let seasonalQuery = '';
-        
         if (currentMonth >= 2 && currentMonth <= 5) {
           seasonalQuery = 'mango';
         } else if (currentMonth >= 6 && currentMonth <= 9) {
@@ -101,21 +106,15 @@ export default function Dashboard() {
         } else {
           seasonalQuery = 'orange';
         }
-        
-        const ingredientResponse = await fetch(
-          `https://api.spoonacular.com/food/ingredients/search?apiKey=${SPOONACULAR_API_KEY}&query=${seasonalQuery}&number=1`
-        );
+        const ingredientResponse = await fetch(`http://localhost:5000/api/spoonacular/seasonal-ingredient?query=${encodeURIComponent(seasonalQuery)}`);
         const ingredientData = await ingredientResponse.json();
-        
         let seasonalIngredient = "Fresh seasonal vegetables are perfect for healthy cooking.";
         if (ingredientData.results && ingredientData.results.length > 0) {
           const ingredient = ingredientData.results[0];
           seasonalIngredient = `${ingredient.name}: Perfect for seasonal cooking and packed with nutrients.`;
         }
-        
         setDailyTip(cookingTip);
         setSeasonalIngredient(seasonalIngredient);
-        
       } catch (error) {
         console.error('Error fetching daily content:', error);
         setDailyTip("Always taste your food while cooking - it's the best way to adjust seasoning!");
@@ -124,7 +123,6 @@ export default function Dashboard() {
         setIsLoadingContent(false);
       }
     };
-    
     fetchDailyContent();
   }, []);
 
@@ -192,24 +190,53 @@ export default function Dashboard() {
       {/* Carousel Section */}
       <div className="mb-8 sm:mb-10">
         <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
-        <div 
-          ref={carouselRef} 
-          className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {quickRecipes.length === 0 ? (
-            <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
-          ) : (
-            quickRecipes.map(recipe => (
-              <div
-                key={recipe.id}
-                className="min-w-[250px] sm:min-w-[280px] md:min-w-[320px] lg:min-w-[350px] max-w-[250px] sm:max-w-[280px] md:max-w-[320px] lg:max-w-[350px] cursor-pointer snap-center flex-shrink-0"
-                onClick={() => handleRecipeClick(recipe)}
-              >
-                <RecipeCard recipe={recipe} />
-              </div>
-            ))
-          )}
+        <div className="relative">
+          {/* Left Arrow */}
+          <button
+            onClick={handlePrev}
+            disabled={carouselIndex === 0}
+            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-[#23483b] border border-[#326755] rounded-full p-2 shadow-lg transition-all ${carouselIndex === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[#19342a]'}`}
+            style={{ display: quickRecipes.length > visibleCards ? 'block' : 'none' }}
+            aria-label="Previous recipes"
+          >
+            <FiArrowRight className="rotate-180" />
+          </button>
+          {/* Carousel Cards */}
+          <div 
+            ref={carouselRef} 
+            className="w-full flex gap-4 overflow-hidden px-10"
+            style={{ minHeight: '370px' }}
+          >
+            {carouselLoading ? (
+              Array.from({ length: visibleCards }).map((_, idx) => (
+                <div key={idx} className="min-w-[320px] max-w-[350px] flex-shrink-0">
+                  <RecipeCardSkeleton />
+                </div>
+              ))
+            ) : quickRecipes.length === 0 ? (
+              <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
+            ) : (
+              quickRecipes.slice(carouselIndex, carouselIndex + visibleCards).map(recipe => (
+                <div
+                  key={recipe.id}
+                  className="min-w-[320px] max-w-[350px] flex-shrink-0 cursor-pointer"
+                  onClick={() => handleRecipeClick(recipe)}
+                >
+                  <RecipeCard recipe={recipe} />
+                </div>
+              ))
+            )}
+          </div>
+          {/* Right Arrow */}
+          <button
+            onClick={handleNext}
+            disabled={carouselIndex === maxIndex}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-[#23483b] border border-[#326755] rounded-full p-2 shadow-lg transition-all ${carouselIndex === maxIndex ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[#19342a]'}`}
+            style={{ display: quickRecipes.length > visibleCards ? 'block' : 'none' }}
+            aria-label="Next recipes"
+          >
+            <FiArrowRight />
+          </button>
         </div>
       </div>
 

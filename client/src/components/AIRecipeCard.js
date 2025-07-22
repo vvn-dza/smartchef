@@ -3,14 +3,11 @@ import { FiClock, FiUsers, FiStar, FiSave, FiShare2, FiYoutube, FiImage, FiZap, 
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
 
-const SPOONACULAR_API_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
-const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
-
 // Debug API keys
 console.log("API Keys check:", {
-  spoonacular: !!SPOONACULAR_API_KEY,
-  youtube: !!YOUTUBE_API_KEY,
-  youtubeKey: YOUTUBE_API_KEY.substring(0, 10) + '...'
+  spoonacular: !!process.env.REACT_APP_SPOONACULAR_API_KEY,
+  youtube: !!process.env.REACT_APP_YOUTUBE_API_KEY,
+  youtubeKey: process.env.REACT_APP_YOUTUBE_API_KEY.substring(0, 10) + '...'
 });
 
 // Helper functions
@@ -77,7 +74,7 @@ const fetchIndianRecipeImage = async (recipeTitle) => {
       console.log('Trying Indian search term:', term);
       
       const response = await fetch(
-        `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(term)}&number=1&addRecipeInformation=false`
+        `http://localhost:5000/api/spoonacular/recipe-image?query=${encodeURIComponent(term)}`
       );
       
       if (response.ok) {
@@ -121,7 +118,7 @@ const fetchGeneralRecipeImage = async (recipeTitle) => {
       console.log('Trying general search strategy:', strategy);
       
       const response = await fetch(
-        `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&query=${encodeURIComponent(strategy)}&number=1&addRecipeInformation=false`
+        `http://localhost:5000/api/spoonacular/recipe-image?query=${encodeURIComponent(strategy)}`
       );
       
       if (response.ok) {
@@ -149,7 +146,7 @@ const fetchRecipeImage = async (recipeTitle) => {
   try {
     console.log('Fetching image for recipe:', recipeTitle);
     
-    if (!SPOONACULAR_API_KEY) {
+    if (!process.env.REACT_APP_SPOONACULAR_API_KEY) {
       console.log('No Spoonacular API key, using placeholder');
       return generateRecipePlaceholder(recipeTitle);
     }
@@ -207,13 +204,13 @@ export default function AIRecipeCard({ recipe, onClose }) {
   }, [recipe]);
 
   const searchYoutubeVideos = async () => {
-    if (!YOUTUBE_API_KEY || youtubeVideos.length > 0) return;
+    if (youtubeVideos.length > 0) return;
 
     setLoadingVideos(true);
     try {
       const searchQuery = encodeURIComponent(`${recipe.title} recipe cooking`);
       const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${searchQuery}&type=video&maxResults=3&key=${YOUTUBE_API_KEY}`
+        `http://localhost:5000/api/youtube/search?q=${searchQuery}`
       );
 
       if (response.ok) {

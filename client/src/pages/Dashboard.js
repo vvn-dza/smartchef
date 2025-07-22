@@ -21,9 +21,9 @@ export default function Dashboard() {
   const [seasonalIngredient, setSeasonalIngredient] = useState('');
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const navigate = useNavigate();
-  const carouselRef = useRef(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselLoading, setCarouselLoading] = useState(true);
+  const carouselRef = useRef(null);
 
   // Fetch quick recipes for the carousel
   useEffect(() => {
@@ -46,30 +46,32 @@ export default function Dashboard() {
     fetchRandomRecipes();
   }, []);
 
-  // Carousel navigation
-  const visibleCards = 3;
-  const maxIndex = Math.max(0, quickRecipes.length - visibleCards);
-  const handlePrev = () => setCarouselIndex(i => Math.max(0, i - 1));
-  const handleNext = () => setCarouselIndex(i => Math.min(maxIndex, i + 1));
-
-  // Carousel auto-scroll
+  // Carousel auto-scroll (DOM-based, scrollBy/scrollTo)
   useEffect(() => {
     if (!carouselRef.current) return;
+    if (quickRecipes.length === 0) return;
     const interval = setInterval(() => {
       const container = carouselRef.current;
       const card = container.querySelector('div.snap-center');
       if (card) {
         container.scrollBy({ left: card.offsetWidth + 16, behavior: 'smooth' });
-        if (container.scrollLeft + container.offsetWidth >= container.scrollWidth) {
+        // If at the end, scroll back to start
+        if (container.scrollLeft + container.offsetWidth >= container.scrollWidth - 10) {
           setTimeout(() => {
             container.scrollTo({ left: 0, behavior: 'smooth' });
-          }, 500);
+          }, 450);
         }
       }
     }, 3000);
-
     return () => clearInterval(interval);
   }, [quickRecipes]);
+
+  // Reset index if cards array shrinks
+  useEffect(() => {
+    if (carouselIndex > quickRecipes.length - 1) {
+      setCarouselIndex(0);
+    }
+  }, [quickRecipes.length, carouselIndex]);
 
   // Fetch featured recipe
   useEffect(() => {
@@ -149,6 +151,17 @@ export default function Dashboard() {
     }
   };
 
+  // Helper to get visible cards with wrap-around
+  const getVisibleCards = () => {
+    if (quickRecipes.length <= 7) return quickRecipes; // Assuming 7 is the limit for visible cards
+    const cards = [];
+    for (let i = 0; i < 7; i++) {
+      const idx = (carouselIndex + i) % quickRecipes.length;
+      cards.push(quickRecipes[idx]);
+    }
+    return cards;
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
       {/* Search Bar */}
@@ -190,53 +203,24 @@ export default function Dashboard() {
       {/* Carousel Section */}
       <div className="mb-8 sm:mb-10">
         <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
-        <div className="relative">
-          {/* Left Arrow */}
-          <button
-            onClick={handlePrev}
-            disabled={carouselIndex === 0}
-            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-[#23483b] border border-[#326755] rounded-full p-2 shadow-lg transition-all ${carouselIndex === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[#19342a]'}`}
-            style={{ display: quickRecipes.length > visibleCards ? 'block' : 'none' }}
-            aria-label="Previous recipes"
-          >
-            <FiArrowRight className="rotate-180" />
-          </button>
-          {/* Carousel Cards */}
-          <div 
-            ref={carouselRef} 
-            className="w-full flex gap-4 overflow-hidden px-10"
-            style={{ minHeight: '370px' }}
-          >
-            {carouselLoading ? (
-              Array.from({ length: visibleCards }).map((_, idx) => (
-                <div key={idx} className="min-w-[320px] max-w-[350px] flex-shrink-0">
-                  <RecipeCardSkeleton />
-                </div>
-              ))
-            ) : quickRecipes.length === 0 ? (
-              <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
-            ) : (
-              quickRecipes.slice(carouselIndex, carouselIndex + visibleCards).map(recipe => (
-                <div
-                  key={recipe.id}
-                  className="min-w-[320px] max-w-[350px] flex-shrink-0 cursor-pointer"
-                  onClick={() => handleRecipeClick(recipe)}
-                >
-                  <RecipeCard recipe={recipe} />
-                </div>
-              ))
-            )}
-          </div>
-          {/* Right Arrow */}
-          <button
-            onClick={handleNext}
-            disabled={carouselIndex === maxIndex}
-            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-[#23483b] border border-[#326755] rounded-full p-2 shadow-lg transition-all ${carouselIndex === maxIndex ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[#19342a]'}`}
-            style={{ display: quickRecipes.length > visibleCards ? 'block' : 'none' }}
-            aria-label="Next recipes"
-          >
-            <FiArrowRight />
-          </button>
+        <div 
+          ref={carouselRef}
+          className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', minHeight: '370px' }}
+        >
+          {quickRecipes.length === 0 ? (
+            <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
+          ) : (
+            quickRecipes.map(recipe => (
+              <div
+                key={recipe.id}
+                className="w-[calc(100%/3-1rem)] min-w-[300px] flex-shrink-0 cursor-pointer snap-center"
+                onClick={() => handleRecipeClick(recipe)}
+              >
+                <RecipeCard recipe={recipe} />
+              </div>
+            ))
+          )}
         </div>
       </div>
 

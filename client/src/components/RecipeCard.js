@@ -100,7 +100,7 @@ export default function RecipeCard({ recipe }) {
       return;
     }
     try {
-      await toggleSavedRecipe(recipe.id);
+      await toggleSavedRecipe(recipe); // Pass the full recipe object
       showToast(
         isSaved ? 'Recipe removed' : 'Recipe saved!',
         isSaved ? 'info' : 'success'

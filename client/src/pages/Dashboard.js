@@ -9,6 +9,10 @@ import AISearch from './AISearch';
 import { useNavigate } from 'react-router-dom';
 import { fetchAllRecipes } from '../api/recipeService';
 import RecipeCardSkeleton from '../components/RecipeCardSkeleton';
+import { useRecipes } from '../context/RecipesContext';
+import { fetchRecipeById } from '../api/recipeService';
+import { logUserActivity } from '../api/activityService';
+import { getIdToken } from 'firebase/auth';
 
 export default function Dashboard() {
   const [search, setSearch] = useState('');
@@ -24,6 +28,10 @@ export default function Dashboard() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselLoading, setCarouselLoading] = useState(true);
   const carouselRef = useRef(null);
+  const { user, recommendations, recommendationsLoading, logLocalActivity } = useRecipes();
+  const [recommendedRecipes, setRecommendedRecipes] = useState([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(true);
+  const recommendedCarouselRef = useRef(null);
 
   // Fetch quick recipes for the carousel
   useEffect(() => {
@@ -50,19 +58,25 @@ export default function Dashboard() {
   useEffect(() => {
     if (!carouselRef.current) return;
     if (quickRecipes.length === 0) return;
+    
     const interval = setInterval(() => {
       const container = carouselRef.current;
+      if (!container || !container.scrollWidth || !container.offsetWidth) return;
+      
       const card = container.querySelector('div.snap-center');
-      if (card) {
+      if (card && container.scrollWidth > container.offsetWidth) {
         container.scrollBy({ left: card.offsetWidth + 16, behavior: 'smooth' });
         // If at the end, scroll back to start
         if (container.scrollLeft + container.offsetWidth >= container.scrollWidth - 10) {
           setTimeout(() => {
-            container.scrollTo({ left: 0, behavior: 'smooth' });
+            if (container && container.scrollTo) {
+              container.scrollTo({ left: 0, behavior: 'smooth' });
+            }
           }, 450);
         }
       }
     }, 3000);
+    
     return () => clearInterval(interval);
   }, [quickRecipes]);
 
@@ -92,10 +106,23 @@ export default function Dashboard() {
     const fetchDailyContent = async () => {
       setIsLoadingContent(true);
       try {
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
         // Get food trivia for cooking tips
-        const triviaResponse = await fetch('http://localhost:5000/api/spoonacular/trivia');
+        const triviaResponse = await fetch('http://localhost:5000/api/spoonacular/trivia', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!triviaResponse.ok) {
+          throw new Error(`Trivia API error: ${triviaResponse.status}`);
+        }
+        
         const triviaData = await triviaResponse.json();
         const cookingTip = triviaData.text || "Always taste your food while cooking!";
+        
         // Get seasonal ingredient based on current month
         const currentMonth = new Date().getMonth();
         let seasonalQuery = '';
@@ -108,7 +135,19 @@ export default function Dashboard() {
         } else {
           seasonalQuery = 'orange';
         }
-        const ingredientResponse = await fetch(`http://localhost:5000/api/spoonacular/seasonal-ingredient?query=${encodeURIComponent(seasonalQuery)}`);
+        
+        const ingredientController = new AbortController();
+        const ingredientTimeoutId = setTimeout(() => ingredientController.abort(), 10000);
+        
+        const ingredientResponse = await fetch(`http://localhost:5000/api/spoonacular/seasonal-ingredient?query=${encodeURIComponent(seasonalQuery)}`, {
+          signal: ingredientController.signal
+        });
+        clearTimeout(ingredientTimeoutId);
+        
+        if (!ingredientResponse.ok) {
+          throw new Error(`Ingredient API error: ${ingredientResponse.status}`);
+        }
+        
         const ingredientData = await ingredientResponse.json();
         let seasonalIngredient = "Fresh seasonal vegetables are perfect for healthy cooking.";
         if (ingredientData.results && ingredientData.results.length > 0) {
@@ -119,6 +158,7 @@ export default function Dashboard() {
         setSeasonalIngredient(seasonalIngredient);
       } catch (error) {
         console.error('Error fetching daily content:', error);
+        // Set fallback content instead of failing
         setDailyTip("Always taste your food while cooking - it's the best way to adjust seasoning!");
         setSeasonalIngredient("Fresh herbs can transform a simple dish into something special.");
       } finally {
@@ -128,9 +168,65 @@ export default function Dashboard() {
     fetchDailyContent();
   }, []);
 
-  const handleSearch = (e) => {
+  // Use local recommendations from context
+  useEffect(() => {
+    console.log('Dashboard recommendations update:', {
+      user: !!user,
+      recommendations: recommendations?.length || 0,
+      recommendationsLoading,
+      recommendedRecipes: recommendedRecipes?.length || 0
+    });
+    
+    if (user && recommendations) {
+      setRecommendedRecipes(recommendations);
+      setLoadingRecommendations(recommendationsLoading);
+    } else {
+      setRecommendedRecipes([]);
+      setLoadingRecommendations(false);
+    }
+  }, [user, recommendations, recommendationsLoading]);
+
+  // Carousel auto-scroll for recommendations
+  useEffect(() => {
+    if (!recommendedCarouselRef.current) return;
+    if (recommendedRecipes.length === 0) return;
+    
+    const interval = setInterval(() => {
+      const container = recommendedCarouselRef.current;
+      if (!container || !container.scrollWidth || !container.offsetWidth) return;
+      
+      const card = container.querySelector('div.snap-center');
+      if (card && container.scrollWidth > container.offsetWidth) {
+        container.scrollBy({ left: card.offsetWidth + 16, behavior: 'smooth' });
+        if (container.scrollLeft + container.offsetWidth >= container.scrollWidth - 10) {
+          setTimeout(() => {
+            if (container && container.scrollTo) {
+              container.scrollTo({ left: 0, behavior: 'smooth' });
+            }
+          }, 450);
+        }
+      }
+    }, 3500);
+    
+    return () => clearInterval(interval);
+  }, [recommendedRecipes]);
+
+  // Log activity when a search is performed
+  const handleSearch = async (e) => {
     e.preventDefault();
     if (search.trim()) {
+      if (user) {
+        try {
+          // Log search activity locally
+          logLocalActivity('search', null, search.trim());
+          
+          // Try backend logging (but don't wait for it)
+          const idToken = await getIdToken(user);
+          logUserActivity({ userId: user.uid, idToken, type: 'search', query: search.trim() }).catch(() => {});
+        } catch (err) {
+          // Optionally handle error
+        }
+      }
       navigate(`/ai-search?query=${encodeURIComponent(search.trim())}`);
     }
   };
@@ -165,23 +261,21 @@ export default function Dashboard() {
   return (
     <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
       {/* Search Bar */}
-      <div className="mb-6 sm:mb-8 lg:mb-10">
-        <form onSubmit={handleSearch} className="w-full">
-          <div className="flex flex-col sm:flex-row gap-3 w-full">
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="What do you want to cook today?"
-              className="flex-1 w-full px-4 py-3 sm:py-2 rounded-lg border border-[#326755] bg-[#19342a] text-white placeholder-[#91cab6] focus:outline-none focus:ring-2 focus:ring-[#0b9766] text-base"
-            />
-            <button
-              type="submit"
-              className="w-full sm:w-auto px-6 py-3 sm:py-2 rounded-lg bg-[#0b9766] text-white font-semibold hover:bg-[#059669] transition-colors text-base"
-            >
-              Search
-            </button>
-          </div>
+      <div className="mb-8 sm:mb-10">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="What do you want to cook today?"
+            className="flex-1 w-full px-4 py-3 sm:py-2 rounded-lg border border-[#326755] bg-[#19342a] text-white placeholder-[#91cab6] focus:outline-none focus:ring-2 focus:ring-[#0b9766] text-base"
+          />
+          <button
+            type="submit"
+            className="w-full sm:w-auto px-6 py-3 sm:py-2 rounded-lg bg-[#0b9766] text-white font-semibold hover:bg-[#059669] transition-colors text-base"
+          >
+            Search
+          </button>
         </form>
       </div>
 
@@ -200,29 +294,71 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Carousel Section */}
-      <div className="mb-8 sm:mb-10">
-        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
-        <div 
-          ref={carouselRef}
-          className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', minHeight: '370px' }}
-        >
-          {quickRecipes.length === 0 ? (
-            <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
-          ) : (
-            quickRecipes.map(recipe => (
-              <div
-                key={recipe.id}
-                className="w-[calc(100%/3-1rem)] min-w-[300px] flex-shrink-0 cursor-pointer snap-center"
-                onClick={() => handleRecipeClick(recipe)}
-              >
-                <RecipeCard recipe={recipe} />
+      {/* Recommended For You Carousel (only if user has recommendations) */}
+      {user && recommendedRecipes.length > 0 && (
+        <div className="mb-8 sm:mb-10">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">
+            Recommended For You 
+            <span className="text-sm font-normal text-[#91cab6]/70 ml-2">
+              ({recommendedRecipes.length} recipes)
+            </span>
+          </h2>
+          <div
+            ref={recommendedCarouselRef}
+            className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', minHeight: '370px' }}
+          >
+            {loadingRecommendations ? (
+              <RecipeCardSkeleton />
+            ) : recommendedRecipes.length === 0 ? (
+              <div className="text-[#91cab6] px-2 py-8 text-center w-full">
+                No recommendations yet. Save some recipes or search for ingredients to get personalized picks!
               </div>
-            ))
-          )}
+            ) : (
+              recommendedRecipes.map(recipe => (
+                <div
+                  key={recipe.id}
+                  className="w-[calc(100%/3-1rem)] min-w-[280px] flex-shrink-0 cursor-pointer snap-center relative"
+                  onClick={() => handleRecipeClick(recipe)}
+                >
+                  <RecipeCard recipe={recipe} />
+                  {recipe.recommendationReason && (
+                    <div className="absolute top-2 left-2 bg-[#0b9766] text-white text-xs px-2 py-1 rounded-full opacity-90 max-w-[calc(100%-1rem)] truncate">
+                      {recipe.recommendationReason}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Featured Recipes Carousel (show if not logged in or no recommendations) */}
+      {(!user || recommendedRecipes.length === 0) && (
+        <div className="mb-8 sm:mb-10">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
+          <div 
+            ref={carouselRef}
+            className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', minHeight: '370px' }}
+          >
+            {quickRecipes.length === 0 ? (
+              <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
+            ) : (
+              quickRecipes.map(recipe => (
+                <div
+                  key={recipe.id}
+                  className="w-[calc(100%/3-1rem)] min-w-[300px] flex-shrink-0 cursor-pointer snap-center"
+                  onClick={() => handleRecipeClick(recipe)}
+                >
+                  <RecipeCard recipe={recipe} />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Browse Recipes CTA */}
       <div className="px-2 sm:px-4 py-6 mb-8 sm:mb-10">

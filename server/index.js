@@ -118,6 +118,9 @@ app.get('/api/filter-categories', getFilterCategories);
 const authenticateFirebaseToken = require('./middleware/authenticateFirebaseToken');
 app.use('/api/recipes/users', authenticateFirebaseToken);
 
+const activityRoutes = require('./routes/activityRoutes');
+app.use('/api/activity', activityRoutes);
+
 // Spoonacular proxy endpoints
 app.get('/api/spoonacular/recipe-image', async (req, res) => {
   try {

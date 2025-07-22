@@ -231,7 +231,7 @@ export default function AIRecipeCard({ recipe, onClose }) {
     }
 
     try {
-      await toggleSavedRecipe(recipe.id);
+      await toggleSavedRecipe(recipe); // Pass the full recipe object, not just the ID
       showToast(
         isSaved ? 'Recipe removed from saved' : 'Recipe saved!',
         isSaved ? 'info' : 'success'

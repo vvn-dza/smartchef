@@ -1,22 +1,66 @@
 // src/components/Navbar.js
 
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { auth } from '../firebaseConfig';
+import { FiMenu, FiX, FiBell, FiUser, FiLogOut } from 'react-icons/fi';
 import { signOut } from 'firebase/auth';
-import { useState, useEffect, useRef } from 'react';
-import { FiBell, FiUser, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
+import { auth, db, collection } from '../firebaseConfig';
+import { getDocs, deleteDoc } from 'firebase/firestore';
+import { useRecipes } from '../context/RecipesContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [notificationAnimation, setNotificationAnimation] = useState(false);
+  const notificationsRef = useRef(null);
+  const dropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const dropdownRef = useRef(null);
+  const { 
+    allRecipes,
+    user: recipesUser,
+    setSelectedRecipe
+  } = useRecipes();
+  const user = auth.currentUser || recipesUser;
+
+  // Add notification sound/animation function to window
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.triggerNotificationAlert = () => {
+        setNotificationAnimation(true);
+        // Play notification sound
+        try {
+          // Create a simple notification sound using Web Audio API
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (e) {
+          console.log('Audio not supported, using animation only');
+        }
+        setTimeout(() => setNotificationAnimation(false), 1000);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user);
+      // setUser(user); // This line was removed as per the edit hint
     });
     return unsubscribe;
   }, []);
@@ -40,12 +84,78 @@ const Navbar = () => {
     setIsOpen(false);
   }, [location.pathname]);
 
+  // Fetch notifications for the logged-in user
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user && !recipesUser) {
+        setNotifications([]);
+        return;
+      }
+      setLoadingNotifications(true);
+      try {
+        // Use local notifications instead of Firestore
+        const localNotifications = JSON.parse(localStorage.getItem('smartchef_notifications') || '[]');
+        setNotifications(localNotifications);
+        console.log('Loaded local notifications:', localNotifications.length);
+      } catch (err) {
+        console.error('Error loading notifications:', err);
+        setNotifications([]);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    };
+    fetchNotifications();
+  }, [user, recipesUser]);
+
+  // Close notifications dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  };
+
+  const handleClearNotifications = async () => {
+    try {
+      // Clear local notifications
+      localStorage.removeItem('smartchef_notifications');
+      setNotifications([]);
+      console.log('Cleared all local notifications');
+    } catch (err) {
+      console.error('Error clearing notifications:', err);
+    }
+  };
+
+  const handleNotificationClick = (notification) => {
+    if (notification.recipeId) {
+      // Find the recipe and open it directly like carousel cards do
+      const recipe = allRecipes?.find(r => r.id === notification.recipeId);
+      
+      if (recipe) {
+        setShowNotifications(false);
+        // Open the recipe card directly
+        setSelectedRecipe(recipe);
+        // Navigate to search page in background
+        navigate('/search');
+      }
     }
   };
 
@@ -101,9 +211,63 @@ const Navbar = () => {
       
       <div className="flex items-center gap-2 sm:gap-4 lg:gap-8">
         {/* Notification Button - Hidden on mobile */}
-        <button className="hidden sm:flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-8 sm:h-10 bg-[#23483b] text-white gap-2 text-xs sm:text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2 sm:px-2.5">
-          <FiBell size={16} className="sm:w-5 sm:h-5" />
-        </button>
+        <div className="relative hidden sm:flex">
+          <button
+            className={`max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-8 sm:h-10 bg-[#23483b] text-white gap-2 text-xs sm:text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2 sm:px-2.5 relative transition-all duration-300 ${
+              notificationAnimation ? 'animate-pulse scale-110 ring-2 ring-[#0b9766]' : ''
+            }`}
+            onClick={() => setShowNotifications((prev) => !prev)}
+            aria-label="Show notifications"
+          >
+            <FiBell size={16} className={`sm:w-5 sm:h-5 ${notificationAnimation ? 'animate-bounce' : ''}`} />
+            {notifications.length > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-[#0b9766] rounded-full animate-pulse"></span>
+            )}
+          </button>
+          {showNotifications && (
+            <div
+              ref={notificationsRef}
+              className="absolute right-0 mt-2 w-72 bg-[#23483b] rounded-lg shadow-lg py-2 z-20 border border-[#326755] max-h-80 overflow-y-auto"
+            >
+              <div className="px-3 py-2 text-white font-semibold text-sm border-b border-[#326755] flex items-center justify-between">
+                <span>Notifications</span>
+                {notifications.length > 0 && (
+                  <button
+                    onClick={handleClearNotifications}
+                    className="text-xs text-[#0b9766] hover:underline"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+              {loadingNotifications ? (
+                <div className="px-3 py-3 text-[#91cab6] text-sm">Loading...</div>
+              ) : notifications.length === 0 ? (
+                <div className="px-3 py-3 text-[#91cab6] text-sm">No notifications yet.</div>
+              ) : (
+                notifications.slice(0, 8).map((noti) => (
+                  <div 
+                    key={noti.id} 
+                    className={`px-3 py-2 border-b border-[#326755] last:border-b-0 cursor-pointer hover:bg-[#19342a] transition-colors ${
+                      noti.recipeId ? 'cursor-pointer' : 'cursor-default'
+                    }`}
+                    onClick={() => noti.recipeId && handleNotificationClick(noti)}
+                  >
+                    <div className="text-[#91cab6] text-xs mb-1 leading-relaxed">
+                      {noti.message.length > 40 
+                        ? `${noti.message.substring(0, 40)}...` 
+                        : noti.message
+                      }
+                    </div>
+                    <div className="text-xs text-[#91cab6] opacity-70">
+                      {noti.timestamp ? new Date(noti.timestamp).toLocaleDateString() : ''}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         
         {/* Profile Avatar */}
         <div className="relative" ref={dropdownRef}>
@@ -118,7 +282,7 @@ const Navbar = () => {
                 className="w-full h-full rounded-full object-cover"
               />
             ) : (
-              <FiUser className="text-white" size={16} className="sm:w-5 sm:h-5" />
+              <FiUser className="text-white sm:w-5 sm:h-5" size={16} />
             )}
           </button>
           
@@ -151,9 +315,66 @@ const Navbar = () => {
           >
             {isOpen ? <FiX size={20} /> : <FiMenu size={20} />}
           </button>
+          
+          {/* Mobile Notifications Dropdown */}
+          {showNotifications && (
+            <div className="absolute right-0 bottom-full mb-2 w-72 bg-[#23483b] rounded-lg shadow-lg py-2 z-50 border border-[#326755] max-h-80 overflow-y-auto">
+              <div className="px-3 py-2 text-white font-semibold text-sm border-b border-[#326755] flex items-center justify-between">
+                <span>Notifications</span>
+                {notifications.length > 0 && (
+                  <button
+                    onClick={handleClearNotifications}
+                    className="text-xs text-[#0b9766] hover:underline"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+              {loadingNotifications ? (
+                <div className="px-3 py-3 text-[#91cab6] text-sm">Loading...</div>
+              ) : notifications.length === 0 ? (
+                <div className="px-3 py-3 text-[#91cab6] text-sm">No notifications yet.</div>
+              ) : (
+                notifications.slice(0, 8).map((noti) => (
+                  <div 
+                    key={noti.id} 
+                    className={`px-3 py-2 border-b border-[#326755] last:border-b-0 cursor-pointer hover:bg-[#19342a] transition-colors ${
+                      noti.recipeId ? 'cursor-pointer' : 'cursor-default'
+                    }`}
+                    onClick={() => noti.recipeId && handleNotificationClick(noti)}
+                  >
+                    <div className="text-[#91cab6] text-xs mb-1 leading-relaxed">
+                      {noti.message.length > 40 
+                        ? `${noti.message.substring(0, 40)}...` 
+                        : noti.message
+                      }
+                    </div>
+                    <div className="text-xs text-[#91cab6] opacity-70">
+                      {noti.timestamp ? new Date(noti.timestamp).toLocaleDateString() : ''}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+          
           {isOpen && (
             <div className="absolute right-0 top-full mt-2 w-56 bg-[#23483b] border border-[#326755] rounded-lg shadow-lg z-50">
               <div className="py-2">
+                {/* Mobile Notification Button */}
+                <div className="px-4 py-3 border-b border-[#326755]">
+                  <button
+                    onClick={() => setShowNotifications((prev) => !prev)}
+                    className="flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white w-full"
+                  >
+                    <FiBell size={16} />
+                    <span>Notifications</span>
+                    {notifications.length > 0 && (
+                      <span className="w-2 h-2 bg-[#0b9766] rounded-full"></span>
+                    )}
+                  </button>
+                </div>
+                
                 <Link
                   to="/dashboard"
                   className={`block px-4 py-3 text-sm font-medium ${isActive('/dashboard') ? 'text-white bg-[#19342a]' : 'text-white/70 hover:text-white hover:bg-[#19342a]'} rounded mx-2`}

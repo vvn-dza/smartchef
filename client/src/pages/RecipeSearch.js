@@ -34,6 +34,7 @@ export default function RecipeSearch() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const urlQuery = params.get('query');
+    
     if (urlQuery) {
       setSearchText(urlQuery);
       fetchRecipes(urlQuery);

@@ -4,6 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
 import AIRecipeCard from '../components/AIRecipeCard';
+import { logUserActivity } from '../api/activityService';
+import { getIdToken } from 'firebase/auth';
 
 console.log("API Key loaded:", !!process.env.REACT_APP_GEMINI_API_KEY);
 console.log("API Key length:", process.env.REACT_APP_GEMINI_API_KEY?.length);
@@ -30,7 +32,7 @@ export default function AISearch() {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { toggleSavedRecipe, savedRecipes, user } = useRecipes();
+  const { toggleSavedRecipe, savedRecipes, user, logLocalActivity } = useRecipes();
   const [showRecipeCard, setShowRecipeCard] = useState(false);
   const location = useLocation();
   const triggeredByUrl = useRef(false);
@@ -113,6 +115,11 @@ export default function AISearch() {
     setRecipeDetails(null);
 
     try {
+      // Log AI search activity locally
+      if (user) {
+        logLocalActivity('ai_search', null, searchText.trim());
+      }
+      
       const response = await fetch('http://localhost:5000/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,7 +164,7 @@ export default function AISearch() {
         aiData: recipeDetails
       };
 
-      await toggleSavedRecipe(recipeToSave.id);
+      await toggleSavedRecipe(recipeToSave);
       showToast('Recipe saved successfully!', 'success');
     } catch (error) {
       console.error('Error saving recipe:', error);

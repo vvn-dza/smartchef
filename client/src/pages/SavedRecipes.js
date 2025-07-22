@@ -49,7 +49,10 @@ export default function SavedRecipes() {
   const handleBulkDelete = async () => {
     try {
       await Promise.all(
-        selectedRecipes.map(recipeId => toggleSavedRecipe(recipeId))
+        selectedRecipes.map(recipeId => {
+          const recipe = savedRecipes.find(r => r.id === recipeId);
+          return recipe ? toggleSavedRecipe(recipe) : Promise.resolve();
+        })
       );
       setSelectedRecipes([]);
       setIsSelectMode(false);

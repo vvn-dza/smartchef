@@ -1,13 +1,46 @@
 // server/controllers/recipeController.js
 const admin = require('../config/firebaseAdmin');
 const { db } = require('../config/firebaseAdmin');
-// Get all recipes
+
+// Get all recipes with pagination
 exports.getAllRecipes = async (req, res) => {
   try {
-    const snapshot = await db.collection('recipes').get();
+    const limit = parseInt(req.query.limit) || 300; // Default limit of 50
+    const offset = parseInt(req.query.offset) || 0;
+    
+    console.log(`Fetching recipes: limit=${limit}, offset=${offset}`);
+    
+    let query = db.collection('recipes').limit(limit);
+    
+    // If offset is provided, we need to use a different approach for pagination
+    if (offset > 0) {
+      // For offset pagination, we need to skip documents
+      // This is not efficient for large datasets, but works for smaller ones
+      const skipQuery = db.collection('recipes').limit(offset);
+      const skipSnapshot = await skipQuery.get();
+      const lastDoc = skipSnapshot.docs[skipSnapshot.docs.length - 1];
+      
+      if (lastDoc) {
+        query = db.collection('recipes').startAfter(lastDoc).limit(limit);
+      }
+    }
+    
+    const snapshot = await query.get();
     const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(recipes);
+    
+    console.log(`Successfully fetched ${recipes.length} recipes`);
+    
+    res.json({
+      recipes,
+      pagination: {
+        limit,
+        offset,
+        hasMore: recipes.length === limit,
+        total: recipes.length
+      }
+    });
   } catch (err) {
+    console.error('Error fetching recipes:', err);
     res.status(500).json({ error: err.message });
   }
 };

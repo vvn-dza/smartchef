@@ -169,7 +169,7 @@ export default function RecipeDetail() {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                toggleSavedRecipe(selectedRecipe.id);
+                toggleSavedRecipe(selectedRecipe);
               }}
               className={`${isSaved ? 'text-[#0b9766]' : 'text-[#91cab6] hover:text-[#0b9766]'}`}
               title={isSaved ? "Saved" : "Save recipe"}

@@ -1,28 +1,6 @@
-const path = require('path');
-const fs = require('fs');
+// Load environment variables
+require('dotenv').config();
 
-// Read .env file manually and remove BOM
-const envPath = path.join(__dirname, '.env');
-const envContent = fs.readFileSync(envPath, 'utf8');
-// Remove BOM if present
-const cleanEnvContent = envContent.replace(/^\uFEFF/, '');
-
-// Parse .env content manually
-const envVars = {};
-cleanEnvContent.split('\n').forEach(line => {
-  const trimmedLine = line.trim();
-  if (trimmedLine && !trimmedLine.startsWith('#')) {
-    const [key, ...valueParts] = trimmedLine.split('=');
-    if (key && valueParts.length > 0) {
-      envVars[key.trim()] = valueParts.join('=').trim();
-    }
-  }
-});
-
-// Set environment variables
-Object.assign(process.env, envVars);
-
-require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -33,8 +11,6 @@ const PORT = process.env.PORT || 5000;
 
 // Debug environment variables
 console.log("=== Environment Variables Debug ===");
-console.log("Current directory:", __dirname);
-console.log("Env file path:", path.join(__dirname, '.env'));
 console.log("GEMINI_API_KEY loaded:", !!process.env.GEMINI_API_KEY);
 console.log("GEMINI_API_KEY length:", process.env.GEMINI_API_KEY?.length);
 console.log("GEMINI_API_KEY first 10 chars:", process.env.GEMINI_API_KEY?.substring(0, 10));

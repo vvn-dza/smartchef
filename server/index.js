@@ -41,12 +41,24 @@ console.log("GEMINI_API_KEY first 10 chars:", process.env.GEMINI_API_KEY?.substr
 console.log("YOUTUBE_API_KEY loaded:", !!process.env.YOUTUBE_API_KEY);
 console.log("YOUTUBE_API_KEY length:", process.env.YOUTUBE_API_KEY?.length);
 console.log("YOUTUBE_API_KEY first 10 chars:", process.env.YOUTUBE_API_KEY?.substring(0, 10));
-console.log("All env vars:", Object.keys(process.env).filter(key => key.includes('GEMINI') || key.includes('YOUTUBE')));
+console.log("FIREBASE_PROJECT_ID loaded:", !!process.env.FIREBASE_PROJECT_ID);
+console.log("FIREBASE_CLIENT_EMAIL loaded:", !!process.env.FIREBASE_CLIENT_EMAIL);
+console.log("FIREBASE_PRIVATE_KEY loaded:", !!process.env.FIREBASE_PRIVATE_KEY);
+console.log("All env vars:", Object.keys(process.env).filter(key => key.includes('GEMINI') || key.includes('YOUTUBE') || key.includes('FIREBASE')));
 console.log("================================");
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' })); // For image data
+// Initialize Firebase Admin
+const { db: firestoreDb } = require('./config/firebaseAdmin');
+
+// Test Firebase connection
+console.log("Testing Firebase connection...");
+firestoreDb.collection('test').doc('test').get()
+  .then(() => {
+    console.log("✅ Firebase connection successful!");
+  })
+  .catch((error) => {
+    console.error("❌ Firebase connection failed:", error);
+  });
 
 // Initialize Gemini with server-side API key
 if (!process.env.GEMINI_API_KEY) {
@@ -55,6 +67,19 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' })); // For image data
+
+// Test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Server is running!', 
+    timestamp: new Date().toISOString(),
+    geminiKey: !!process.env.GEMINI_API_KEY
+  });
+});
 
 // Proxy endpoint for recipe generation
 app.post('/api/generate-recipe', async (req, res) => {
@@ -137,6 +162,41 @@ app.post('/api/generate-recipe', async (req, res) => {
       }
     }
     
+    // Generate image for text-based recipes using Spoonacular
+    if (!imageData && recipe.title && process.env.SPOONACULAR_API_KEY) {
+      try {
+        console.log(" Fetching image for recipe:", recipe.title);
+        console.log("Spoonacular API Key present:", !!process.env.SPOONACULAR_API_KEY);
+        
+        // Use Spoonacular to get a food image
+        const imageUrl = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${process.env.SPOONACULAR_API_KEY}&query=${encodeURIComponent(recipe.title)}&number=1&addRecipeInformation=false`;
+        console.log("Spoonacular URL:", imageUrl.replace(process.env.SPOONACULAR_API_KEY, 'API_KEY_HIDDEN'));
+        
+        const imageResponse = await axios.get(imageUrl);
+        console.log("Spoonacular response status:", imageResponse.status);
+        console.log("Spoonacular response data:", imageResponse.data);
+        
+        if (imageResponse.data.results && imageResponse.data.results.length > 0) {
+          recipe.imageUrl = imageResponse.data.results[0].image;
+          console.log("✅ Generated image URL from Spoonacular:", recipe.imageUrl);
+        } else {
+          console.log("⚠️ No image found in Spoonacular for:", recipe.title);
+        }
+      } catch (imageError) {
+        console.log("⚠️ Image generation failed:", imageError.message);
+        if (imageError.response) {
+          console.log("Spoonacular error response:", imageError.response.status, imageError.response.data);
+        }
+        // Continue without image
+      }
+    } else {
+      console.log("Image generation skipped:", {
+        hasImageData: !!imageData,
+        hasTitle: !!recipe.title,
+        hasSpoonacularKey: !!process.env.SPOONACULAR_API_KEY
+      });
+    }
+    
     // Send formatted response to frontend
     res.json(recipe);
     
@@ -157,11 +217,92 @@ app.post('/api/generate-recipe', async (req, res) => {
   }
 });
 
+// Store AI recipe temporarily
+app.post('/api/store-ai-recipe', async (req, res) => {
+  try {
+    const { recipe, userId } = req.body;
+    
+    console.log('Storing AI recipe:', { recipe: recipe.title, userId });
+    
+    if (!recipe || !userId) {
+      return res.status(400).json({ error: 'Recipe and userId are required' });
+    }
+
+    // Create a complete AI recipe document
+    const aiRecipeData = {
+      ...recipe,
+      isAIGenerated: true,
+      aiData: recipe,
+      createdAt: new Date().toISOString(),
+      userId: userId,
+      temporary: true, // Mark as temporary
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Expire in 24 hours
+      // Store all recipe data
+      title: recipe.title,
+      description: recipe.description,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      prepTime: recipe.prepTime,
+      cookTime: recipe.cookTime,
+      servings: recipe.servings,
+      nutrition: recipe.nutrition,
+      difficulty: recipe.difficulty,
+      cuisine: recipe.cuisine,
+      imageUrl: recipe.imageUrl
+    };
+
+    // Store in Firestore
+    const recipeRef = firestoreDb.collection('aiRecipes').doc();
+    await recipeRef.set(aiRecipeData);
+
+    console.log('AI recipe stored successfully:', recipeRef.id);
+
+    res.json({ 
+      success: true, 
+      recipeId: recipeRef.id,
+      message: 'AI recipe stored temporarily'
+    });
+  } catch (error) {
+    console.error('Error storing AI recipe:', error);
+    res.status(500).json({ error: 'Failed to store AI recipe', details: error.message });
+  }
+});
+
+// Get AI recipe by ID
+app.get('/api/ai-recipe/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const recipeDoc = await firestoreDb.collection('aiRecipes').doc(id).get();
+    
+    if (!recipeDoc.exists) {
+      return res.status(404).json({ error: 'AI recipe not found' });
+    }
+
+    const recipeData = recipeDoc.data();
+    
+    // Check if expired
+    if (recipeData.expiresAt && new Date(recipeData.expiresAt.toDate()) < new Date()) {
+      // Delete expired recipe
+      await firestoreDb.collection('aiRecipes').doc(id).delete();
+      return res.status(404).json({ error: 'AI recipe has expired' });
+    }
+
+    res.json({ id: recipeDoc.id, ...recipeData });
+  } catch (error) {
+    console.error('Error fetching AI recipe:', error);
+    res.status(500).json({ error: 'Failed to fetch AI recipe' });
+  }
+});
+
+// Add your existing routes
 const recipeRoutes = require('./routes/recipeRoutes');
 app.use('/api/recipes', recipeRoutes);
+
 const { getIngredientCategories, getFilterCategories } = require('./controllers/recipeController');
 app.get('/api/ingredient-categories', getIngredientCategories);
 app.get('/api/filter-categories', getFilterCategories);
+
 const authenticateFirebaseToken = require('./middleware/authenticateFirebaseToken');
 app.use('/api/recipes/users', authenticateFirebaseToken);
 

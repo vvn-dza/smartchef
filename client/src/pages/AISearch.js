@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { FiSearch, FiCamera, FiUpload, FiArrowLeft, FiClock, FiUsers, FiStar, FiYoutube, FiSave, FiShare2, FiImage, FiZap } from 'react-icons/fi';
+import { FiSearch, FiCamera, FiUpload, FiArrowLeft, FiClock, FiUsers, FiStar, FiYoutube, FiSave, FiShare2, FiImage, FiZap, FiBookmark } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
 import AIRecipeCard from '../components/AIRecipeCard';
 import { logUserActivity } from '../api/activityService';
 import { getIdToken } from 'firebase/auth';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 console.log("API Key loaded:", !!process.env.REACT_APP_GEMINI_API_KEY);
 console.log("API Key length:", process.env.REACT_APP_GEMINI_API_KEY?.length);
@@ -120,6 +121,8 @@ export default function AISearch() {
         logLocalActivity('ai_search', null, searchText.trim());
       }
       
+      console.log('Generating recipe for:', searchText || 'image upload');
+      
       const response = await fetch('http://localhost:5000/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,9 +132,58 @@ export default function AISearch() {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to generate recipe');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to generate recipe: ${errorText}`);
+      }
+      
       const recipe = await response.json();
-      setRecipeDetails(recipe);
+      console.log('Generated recipe:', recipe);
+      
+      // Create a complete recipe object
+      const recipeWithId = {
+        ...recipe,
+        id: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        isAIGenerated: true,
+        aiData: recipe,
+        imageUrl: recipe.imageUrl || null,
+        createdAt: new Date().toISOString(),
+        prepTime: parseInt(recipe.prepTime) || 30,
+        servings: parseInt(recipe.servings) || 4,
+        cuisine: recipe.cuisine ? [recipe.cuisine] : [],
+        imagePath: null
+      };
+      
+      console.log('Recipe with ID:', recipeWithId);
+      
+      // Store the complete AI recipe in the database
+      if (user) {
+        try {
+          console.log('Storing recipe in database...');
+          const storeResponse = await fetch('http://localhost:5000/api/store-ai-recipe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipe: recipeWithId,
+              userId: user.uid
+            })
+          });
+          
+          if (storeResponse.ok) {
+            const storeResult = await storeResponse.json();
+            recipeWithId.dbId = storeResult.recipeId;
+            console.log('Complete AI recipe stored in database:', storeResult.recipeId);
+          } else {
+            const errorText = await storeResponse.text();
+            console.error('Failed to store recipe:', errorText);
+          }
+        } catch (storeError) {
+          console.error('Failed to store AI recipe:', storeError);
+          // Continue even if storage fails
+        }
+      }
+      
+      setRecipeDetails(recipeWithId);
       setShowRecipeCard(true);
       showToast("Recipe generated successfully!", "success");
     } catch (error) {
@@ -139,36 +191,6 @@ export default function AISearch() {
       showToast("Failed to generate recipe. Please try again.", "error");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSaveRecipe = async () => {
-    if (!user) {
-      showToast('Please login to save recipes', 'error');
-      return;
-    }
-    
-    try {
-      // Create a recipe object compatible with your existing system
-      const recipeToSave = {
-        id: `ai-${Date.now()}`,
-        title: recipeDetails.title,
-        description: recipeDetails.description,
-        ingredients: recipeDetails.ingredients,
-        instructions: recipeDetails.instructions,
-        prepTime: parseInt(recipeDetails.prepTime) || 30,
-        servings: parseInt(recipeDetails.servings) || 4,
-        cuisine: [recipeDetails.cuisine],
-        imagePath: recipeDetails.imageUrl || '/placeholder-food.jpg',
-        isAIGenerated: true,
-        aiData: recipeDetails
-      };
-
-      await toggleSavedRecipe(recipeToSave);
-      showToast('Recipe saved successfully!', 'success');
-    } catch (error) {
-      console.error('Error saving recipe:', error);
-      showToast('Failed to save recipe', 'error');
     }
   };
 
@@ -250,10 +272,13 @@ export default function AISearch() {
             {loading ? (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Generating...</span>
+                <span>Generating Recipe...</span>
               </div>
             ) : (
-              <span>Generate Recipes</span>
+              <div className="flex items-center gap-2">
+                <FiZap className="w-4 h-4" />
+                <span>Generate Recipe</span>
+              </div>
             )}
           </button>
         </div>

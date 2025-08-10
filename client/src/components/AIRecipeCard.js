@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { FiClock, FiUsers, FiStar, FiSave, FiShare2, FiYoutube, FiImage, FiZap, FiX } from 'react-icons/fi';
+import { FiClock, FiUsers, FiStar, FiBookmark, FiShare2, FiYoutube, FiImage, FiZap, FiX } from 'react-icons/fi';
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
+import LoadingSpinner from './LoadingSpinner';
 
 // Debug API keys
 console.log("API Keys check:", {
@@ -179,8 +180,31 @@ export default function AIRecipeCard({ recipe, onClose }) {
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [recipeImage, setRecipeImage] = useState(null);
   const [imageLoading, setImageLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const isSaved = savedRecipes.some(r => r.id === recipe?.id);
+  // Check if this recipe is saved by comparing title for AI recipes
+  const isSaved = savedRecipes.some(r => {
+    if (recipe.isAIGenerated) {
+      // For AI recipes, check by title and AI flag, or by dbId if available
+      const titleMatch = r.isAIGenerated && r.title === recipe.title;
+      const idMatch = recipe.dbId && r.id === recipe.dbId;
+      console.log('Checking if saved:', { 
+        recipeTitle: recipe.title, 
+        savedTitle: r.title, 
+        titleMatch, 
+        recipeDbId: recipe.dbId, 
+        savedId: r.id, 
+        idMatch,
+        isSaved: titleMatch || idMatch
+      });
+      return titleMatch || idMatch;
+    } else {
+      return r.id === recipe.id;
+    }
+  });
+
+  console.log('Current saved recipes count:', savedRecipes.length);
+  console.log('Is this recipe saved?', isSaved);
 
   useEffect(() => {
     const loadImage = async () => {
@@ -188,12 +212,12 @@ export default function AIRecipeCard({ recipe, onClose }) {
       
       // ONLY use Gemini's imageUrl
       if (recipe?.imageUrl) {
-        console.log('Using Gemini imageUrl:', recipe.imageUrl);
+        console.log('Using recipe imageUrl:', recipe.imageUrl);
         setRecipeImage(recipe.imageUrl);
         setImageLoading(false);
       } else {
         // If no imageUrl from Gemini, use placeholder
-        console.log('No imageUrl from Gemini, using placeholder');
+        console.log('No imageUrl from recipe, using placeholder');
         setRecipeImage(generateRecipePlaceholder(recipe.title));
         setImageLoading(false);
       }
@@ -238,14 +262,46 @@ export default function AIRecipeCard({ recipe, onClose }) {
       return;
     }
 
+    if (isSaving) return; // Prevent double-clicking
+
     try {
-      await toggleSavedRecipe(recipe); // Pass the full recipe object, not just the ID
+      setIsSaving(true);
+      
+      // Create a complete recipe object for saving
+      const recipeToSave = {
+        ...recipe,
+        id: recipe.dbId || recipe.id || `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        isAIGenerated: true,
+        aiData: recipe,
+        imageUrl: recipe.imageUrl || recipeImage, // Use the loaded image
+        createdAt: recipe.createdAt || new Date().toISOString(),
+        prepTime: parseInt(recipe.prepTime) || 30,
+        servings: parseInt(recipe.servings) || 4,
+        cuisine: recipe.cuisine ? [recipe.cuisine] : [],
+        imagePath: null, // AI recipes don't use imagePath
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions
+      };
+
+      console.log('Saving AI recipe:', recipeToSave);
+      console.log('Current saved recipes before save:', savedRecipes);
+      console.log('User:', user.uid);
+      
+      await toggleSavedRecipe(recipeToSave);
+      
+      console.log('Save operation completed');
+      
       showToast(
         isSaved ? 'Recipe removed from saved' : 'Recipe saved!',
         isSaved ? 'info' : 'success'
       );
     } catch (error) {
+      console.error('Error saving recipe:', error);
       showToast('Failed to save recipe', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -290,11 +346,15 @@ export default function AIRecipeCard({ recipe, onClose }) {
             </button>
             <button 
               onClick={handleSaveRecipe}
-              disabled={!user}
-              className={`${isSaved ? 'text-[#0b9766]' : 'text-[#91cab6] hover:text-[#0b9766]'} transition-colors p-1 sm:p-2 disabled:opacity-50`}
+              disabled={!user || isSaving}
+              className={`${isSaved ? 'bg-[#0b9766] text-white' : 'text-[#91cab6] hover:text-[#0b9766]'} transition-colors p-1 sm:p-2 disabled:opacity-50`}
               title={isSaved ? "Saved" : "Save recipe"}
             >
-              <FiSave size={16} fill={isSaved ? 'currentColor' : 'none'} />
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <FiBookmark size={16} fill={isSaved ? 'currentColor' : 'none'} />
+              )}
             </button>
             <button 
               onClick={onClose}
@@ -310,34 +370,32 @@ export default function AIRecipeCard({ recipe, onClose }) {
         <div className="flex flex-col lg:flex-row h-[calc(90vh-80px)] overflow-hidden">
           {/* Left Side - Image and Info */}
           <div className="w-full lg:w-1/3 p-4 border-b lg:border-b-0 lg:border-r border-[#326755] flex flex-col">
-            {/* Image - FIXED: Better loading screen */}
-            <div className="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg overflow-hidden border border-[#326755] mb-4 relative">
+            {/* Image - FIXED: Better ratio for viewing */}
+            {/* Image - Show full image without cropping */}
+            <div className="w-full bg-center bg-no-repeat rounded-lg overflow-hidden border border-[#326755] mb-4 relative">
               {imageLoading ? (
-                <div className="w-full h-full bg-[#19342a] flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 border-2 border-[#0b9766] border-t-transparent rounded-full animate-spin"></div>
-                    <div className="text-[#91cab6] text-sm">Loading image...</div>
-                  </div>
+                <div className="w-full h-[350px] flex items-center justify-center">
+                  <LoadingSpinner size="lg" text="Loading image..." />
                 </div>
               ) : recipeImage ? (
                 <img
                   src={recipeImage}
                   alt={recipe.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-[350px] object-contain bg-[#19342a]"
                   onLoad={() => setImageLoading(false)}
-                  onError={(e) => {
-                    console.log('Gemini image failed to load:', recipeImage);
-                    // If Gemini's image fails, use placeholder
+                  onError={() => {
+                    console.log('Image failed to load:', recipeImage);
                     setRecipeImage(generateRecipePlaceholder(recipe.title));
                     setImageLoading(false);
                   }}
                 />
               ) : (
-                <div className="w-full h-full bg-[#19342a] flex items-center justify-center">
+                <div className="w-full h-[350px] flex items-center justify-center bg-[#19342a]">
                   <FiImage className="w-12 h-12 text-[#91cab6]" />
                 </div>
               )}
             </div>
+
             
             {/* Quick Stats */}
             <div className="flex items-center gap-3 sm:gap-4 mb-4 text-xs sm:text-sm">
@@ -469,8 +527,7 @@ export default function AIRecipeCard({ recipe, onClose }) {
                 <div className="space-y-3">
                   {loadingVideos ? (
                     <div className="flex items-center justify-center py-8">
-                      <div className="w-6 h-6 border-2 border-[#0b9766] border-t-transparent rounded-full animate-spin"></div>
-                      <span className="ml-2 text-[#91cab6] text-sm">Loading videos...</span>
+                      <LoadingSpinner size="md" text="Loading videos..." />
                     </div>
                   ) : youtubeVideos.length > 0 ? (
                     <div className="space-y-3">

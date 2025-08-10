@@ -1,6 +1,5 @@
 // server/controllers/recipeController.js
-const admin = require('../config/firebaseAdmin');
-const { db } = require('../config/firebaseAdmin');
+const { db, bucket } = require('../config/firebaseAdmin');
 
 // Get all recipes with pagination
 exports.getAllRecipes = async (req, res) => {
@@ -111,12 +110,24 @@ exports.saveRecipe = async (req, res) => {
   try {
     const { userId } = req.params;
     const { recipeId, recipeData } = req.body;
+    
+    console.log('Save recipe request:', { userId, recipeId, hasRecipeData: !!recipeData });
+    
     if (!recipeId || !recipeData) {
       return res.status(400).json({ error: 'recipeId and recipeData are required' });
     }
-    await db.collection('users').doc(userId).collection('savedRecipes').doc(recipeId).set(recipeData);
-    res.json({ success: true });
+    
+    // Add timestamp
+    const recipeToSave = {
+      ...recipeData,
+      savedAt: new Date().toISOString()
+    };
+    
+    await db.collection('users').doc(userId).collection('savedRecipes').doc(recipeId).set(recipeToSave);
+    console.log('Recipe saved successfully for user:', userId);
+    res.json({ success: true, recipeId });
   } catch (err) {
+    console.error('Error saving recipe:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -125,9 +136,13 @@ exports.saveRecipe = async (req, res) => {
 exports.removeSavedRecipe = async (req, res) => {
   try {
     const { userId, recipeId } = req.params;
+    console.log('Remove recipe request:', { userId, recipeId });
+    
     await db.collection('users').doc(userId).collection('savedRecipes').doc(recipeId).delete();
+    console.log('Recipe removed successfully for user:', userId);
     res.json({ success: true });
   } catch (err) {
+    console.error('Error removing recipe:', err);
     res.status(500).json({ error: err.message });
   }
 };

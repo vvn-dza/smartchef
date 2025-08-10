@@ -3,6 +3,7 @@ import { useRecipes } from '../context/RecipesContext';
 import { useToast } from '../context/ToastContext';
 import { FiClock, FiBookmark, FiStar, FiUsers, FiZap } from 'react-icons/fi';
 import { ImageService } from '../services/imageService';
+import LoadingSpinner from './LoadingSpinner';
 
 export default function RecipeCard({ recipe }) {
   const { toggleSavedRecipe, savedRecipes, setSelectedRecipe, user, saving } = useRecipes();
@@ -135,63 +136,55 @@ export default function RecipeCard({ recipe }) {
 
   return (
     <div 
-      className="bg-[#23483b] rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer overflow-hidden group relative border border-[#326755] max-h-[85vh] flex flex-col h-full"
+      className="bg-[#19342a] rounded-lg overflow-hidden border border-[#326755] hover:border-[#0b9766] transition-all duration-300 cursor-pointer group"
       onClick={() => setSelectedRecipe(recipe)}
     >
-      {/* AI Badge */}
-      {isAIGenerated && (
-        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10 bg-gradient-to-r from-[#0b9766] to-[#059669] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 shadow-lg">
-          <FiZap className="w-3 h-3" />
-          AI
-        </div>
-      )}
-
-      {/* Image Container - FIXED: Better loading screen */}
-      <div className="relative h-40 sm:h-48 overflow-hidden flex-shrink-0">
+      {/* Image Container */}
+      <div className="relative aspect-square bg-[#23483b] overflow-hidden">
         {imageLoading ? (
-          <div className="w-full h-full bg-[#19342a] flex items-center justify-center">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-2 border-[#0b9766] border-t-transparent rounded-full animate-spin"></div>
-              <div className="text-[#91cab6] text-sm">Loading image...</div>
-            </div>
+          <div className="w-full h-full flex items-center justify-center">
+            <LoadingSpinner size="md" text="Loading image..." />
           </div>
-        ) : (
+        ) : imageUrl ? (
           <img
             src={imageUrl}
-            alt={recipeData.title}
+            alt={recipe.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-            onLoad={() => {
-              setImageLoading(false);
-              if (imageLoadTimeoutRef.current) {
-                clearTimeout(imageLoadTimeoutRef.current);
-              }
-            }}
             onError={(e) => {
-              console.error('Image failed to load:', imageUrl);
-              e.target.onerror = null;
-              e.target.src = '/placeholder-food.jpg';
+              console.log('Image failed to load:', imageUrl);
+              setImageUrl('/placeholder-food.jpg');
               setImageError(true);
-              setImageLoading(false);
-              if (imageLoadTimeoutRef.current) {
-                clearTimeout(imageLoadTimeoutRef.current);
-              }
             }}
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <FiZap className="w-12 h-12 text-[#91cab6]" />
+          </div>
+        )}
+        
+        {/* AI Badge */}
+        {isAIGenerated && (
+          <div className="absolute top-2 left-2 bg-[#0b9766] text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+            <FiZap className="w-3 h-3" />
+            AI
+          </div>
         )}
         
         {/* Save Button */}
         <button
           onClick={handleSaveClick}
           disabled={saving}
-          className={`absolute top-2 sm:top-3 right-2 sm:right-3 p-1.5 sm:p-2 rounded-full transition-all duration-200 ${
+          className={`absolute top-2 right-2 p-2 rounded-full transition-all duration-200 ${
             isSaved 
-              ? 'bg-[#0b9766] text-white shadow-lg' 
-              : 'bg-[#23483b]/80 text-[#91cab6] hover:bg-[#23483b] hover:shadow-lg'
+              ? 'bg-[#0b9766] text-white' 
+              : 'bg-[#23483b] text-[#91cab6] hover:bg-[#0b9766] hover:text-white'
           } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
-          aria-label={isSaved ? "Remove from saved" : "Save recipe"}
         >
-          <FiBookmark className={isSaved ? 'fill-current' : ''} size={16} />
+          {saving ? (
+            <LoadingSpinner size="sm" text="" />
+          ) : (
+            <FiBookmark size={16} fill={isSaved ? 'currentColor' : 'none'} />
+          )}
         </button>
       </div>
 

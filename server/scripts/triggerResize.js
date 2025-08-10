@@ -1,9 +1,9 @@
-const { storage } = require('../config/firebaseAdmin');
+const { bucket } = require('../config/firebaseAdmin');
 const { ref, uploadBytes } = require('firebase/storage');
 
 async function triggerResizeForExistingImages() {
   try {
-    const bucket = storage.bucket('smartchef-app-c4b56.firebasestorage.app');
+    // Use bucket directly instead of storage.bucket()
     const [files] = await bucket.getFiles({ prefix: 'recipes/' });
     
     console.log(`Found ${files.length} images to process`);

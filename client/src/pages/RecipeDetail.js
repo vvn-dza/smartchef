@@ -129,18 +129,29 @@ export default function RecipeDetail() {
   };
 
   const renderTags = () => {
-    if (!selectedRecipe.cuisine && !selectedRecipe.dietaryTags) return null;
+    // Handle both array and string formats for cuisine
+    const cuisineArray = Array.isArray(selectedRecipe.cuisine) 
+      ? selectedRecipe.cuisine 
+      : selectedRecipe.cuisine 
+        ? [selectedRecipe.cuisine] 
+        : [];
+    
+    const dietaryArray = Array.isArray(selectedRecipe.dietaryTags) 
+      ? selectedRecipe.dietaryTags 
+      : [];
+    
+    if (cuisineArray.length === 0 && dietaryArray.length === 0) return null;
     
     return (
       <div className="mt-4">
         <h3 className="font-bold text-lg mb-2 text-white">Tags</h3>
         <div className="flex flex-wrap gap-2">
-          {selectedRecipe.cuisine?.map((tag, index) => (
+          {cuisineArray.map((tag, index) => (
             <span key={`cuisine-${index}`} className="bg-[#0b9766] text-white text-xs px-2 py-1 rounded">
               {tag}
             </span>
           ))}
-          {selectedRecipe.dietaryTags?.map((tag, index) => (
+          {dietaryArray.map((tag, index) => (
             <span key={`diet-${index}`} className="bg-[#326755] text-[#91cab6] text-xs px-2 py-1 rounded">
               {tag}
             </span>

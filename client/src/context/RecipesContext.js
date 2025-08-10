@@ -11,6 +11,7 @@ import {
 import { fetchAllRecipes, fetchFilterCategories, fetchSavedRecipes, saveRecipeForUser, removeSavedRecipeForUser } from '../api/recipeService';
 import { logUserActivity } from '../api/activityService';
 import { getIdToken } from 'firebase/auth';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const RecipesContext = createContext();
 
@@ -523,28 +524,58 @@ export function RecipesProvider({ children }) {
   }, [user, allRecipes, savedRecipes, generateLocalRecommendations]);
 
   const toggleSavedRecipe = useCallback(async (recipe) => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user, cannot save recipe');
+      return;
+    }
+    
+    console.log('toggleSavedRecipe called with:', recipe);
+    console.log('Current savedRecipes:', savedRecipes);
+    
     setSaving(true);
     try {
       const idToken = await getIdToken(user);
-      const isSaved = savedRecipes.some(r => r.id === recipe.id);
+      
+      // For AI recipes, check by title and AI flag, for regular recipes check by ID
+      const isSaved = savedRecipes.some(r => {
+        if (recipe.isAIGenerated) {
+          // For AI recipes, check by title and AI flag
+          return r.isAIGenerated && r.title === recipe.title;
+        } else {
+          // For regular recipes, check by ID
+          return r.id === recipe.id;
+        }
+      });
+      
+      console.log('Recipe saved check:', { recipe, isSaved, savedRecipes });
+      
       if (isSaved) {
-        await removeSavedRecipeForUser(user.uid, recipe.id, idToken);
-        setSavedRecipes(prev => prev.filter(r => r.id !== recipe.id));
-        // Log remove activity locally
-        logLocalActivity('remove', recipe.id);
-        // Try backend logging (but don't wait for it)
-        logUserActivity({ userId: user.uid, idToken, type: 'remove', recipeId: recipe.id }).catch(() => {});
+        // Find the saved recipe to remove
+        const savedRecipe = savedRecipes.find(r => {
+          if (recipe.isAIGenerated) {
+            return r.isAIGenerated && r.title === recipe.title;
+          } else {
+            return r.id === recipe.id;
+          }
+        });
+        
+        if (savedRecipe) {
+          console.log('Removing saved recipe:', savedRecipe);
+          await removeSavedRecipeForUser(user.uid, savedRecipe.id, idToken);
+          setSavedRecipes(prev => prev.filter(r => r.id !== savedRecipe.id));
+          logLocalActivity('remove', savedRecipe.id);
+          logUserActivity({ userId: user.uid, idToken, type: 'remove', recipeId: savedRecipe.id }).catch(() => {});
+        }
       } else {
+        console.log('Saving recipe to database:', recipe);
         await saveRecipeForUser(user.uid, recipe.id, recipe, idToken);
         setSavedRecipes(prev => [...prev, recipe]);
-        // Log save activity locally
         logLocalActivity('save', recipe.id);
-        // Try backend logging (but don't wait for it)
         logUserActivity({ userId: user.uid, idToken, type: 'save', recipeId: recipe.id }).catch(() => {});
+        console.log('Recipe saved successfully');
       }
     } catch (err) {
-      // Optionally handle error
+      console.error('Error toggling saved recipe:', err);
     } finally {
       setSaving(false);
     }

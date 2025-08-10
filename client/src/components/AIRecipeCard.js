@@ -7,7 +7,8 @@ import { useRecipes } from '../context/RecipesContext';
 console.log("API Keys check:", {
   spoonacular: !!process.env.REACT_APP_SPOONACULAR_API_KEY,
   youtube: !!process.env.REACT_APP_YOUTUBE_API_KEY,
-  youtubeKey: process.env.REACT_APP_YOUTUBE_API_KEY.substring(0, 10) + '...'
+  gemini: !!process.env.REACT_APP_GEMINI_API_KEY,
+  youtubeKey: process.env.REACT_APP_YOUTUBE_API_KEY?.substring(0, 10) + '...'
 });
 
 // Helper functions
@@ -209,16 +210,23 @@ export default function AIRecipeCard({ recipe, onClose }) {
     setLoadingVideos(true);
     try {
       const searchQuery = encodeURIComponent(`${recipe.title} recipe cooking`);
+      console.log("🎥 Searching YouTube for:", searchQuery);
+      
       const response = await fetch(
         `http://localhost:5000/api/youtube/search?q=${searchQuery}`
       );
 
       if (response.ok) {
         const data = await response.json();
+        console.log("✅ YouTube response:", data);
         setYoutubeVideos(data.items || []);
+      } else {
+        console.error("❌ YouTube API error:", response.status, response.statusText);
+        setYoutubeVideos([]);
       }
     } catch (error) {
-      console.error('Error fetching YouTube videos:', error);
+      console.error('❌ Error fetching YouTube videos:', error);
+      setYoutubeVideos([]);
     } finally {
       setLoadingVideos(false);
     }
@@ -302,11 +310,14 @@ export default function AIRecipeCard({ recipe, onClose }) {
         <div className="flex flex-col lg:flex-row h-[calc(90vh-80px)] overflow-hidden">
           {/* Left Side - Image and Info */}
           <div className="w-full lg:w-1/3 p-4 border-b lg:border-b-0 lg:border-r border-[#326755] flex flex-col">
-            {/* Image */}
+            {/* Image - FIXED: Better loading screen */}
             <div className="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg overflow-hidden border border-[#326755] mb-4 relative">
               {imageLoading ? (
                 <div className="w-full h-full bg-[#19342a] flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-[#0b9766] border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-2 border-[#0b9766] border-t-transparent rounded-full animate-spin"></div>
+                    <div className="text-[#91cab6] text-sm">Loading image...</div>
+                  </div>
                 </div>
               ) : recipeImage ? (
                 <img

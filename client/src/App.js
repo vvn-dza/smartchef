@@ -14,6 +14,7 @@ import Profile from './pages/Profile';
 import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import './scripts/testNotifications.js';
 
 const Layout = ({ children }) => (
   <div className="relative flex size-full min-h-screen flex-col bg-[#11221c] dark group/design-root overflow-x-hidden">

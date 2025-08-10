@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth, db, collection } from '../firebaseConfig';
 import { getDocs, deleteDoc } from 'firebase/firestore';
 import { useRecipes } from '../context/RecipesContext';
+import notificationService from '../services/notificationService';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -93,8 +94,7 @@ const Navbar = () => {
       }
       setLoadingNotifications(true);
       try {
-        // Use local notifications instead of Firestore
-        const localNotifications = JSON.parse(localStorage.getItem('smartchef_notifications') || '[]');
+        const localNotifications = notificationService.getAll();
         setNotifications(localNotifications);
         console.log('Loaded local notifications:', localNotifications.length);
       } catch (err) {
@@ -106,6 +106,33 @@ const Navbar = () => {
     };
     fetchNotifications();
   }, [user, recipesUser]);
+
+  // Listen for notification updates
+  useEffect(() => {
+    // Listen for notification updates
+    const handleNotificationUpdate = () => {
+      const localNotifications = JSON.parse(localStorage.getItem('smartchef_notifications') || '[]');
+      setNotifications(localNotifications);
+      console.log('Notifications updated:', localNotifications.length);
+    };
+
+    // Listen for custom events
+    window.addEventListener('notificationsUpdated', handleNotificationUpdate);
+    
+    // Also listen for storage changes (for cross-tab updates)
+    const handleStorageChange = (e) => {
+      if (e.key === 'smartchef_notifications') {
+        handleNotificationUpdate();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('notificationsUpdated', handleNotificationUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Close notifications dropdown when clicking outside
   useEffect(() => {
@@ -316,19 +343,27 @@ const Navbar = () => {
             {isOpen ? <FiX size={20} /> : <FiMenu size={20} />}
           </button>
           
-          {/* Mobile Notifications Dropdown */}
+          {/* Mobile Notifications Dropdown - FIXED: Now appears above menu with close button */}
           {showNotifications && (
             <div className="absolute right-0 bottom-full mb-2 w-72 bg-[#23483b] rounded-lg shadow-lg py-2 z-50 border border-[#326755] max-h-80 overflow-y-auto">
               <div className="px-3 py-2 text-white font-semibold text-sm border-b border-[#326755] flex items-center justify-between">
                 <span>Notifications</span>
-                {notifications.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={handleClearNotifications}
+                      className="text-xs text-[#0b9766] hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  )}
                   <button
-                    onClick={handleClearNotifications}
-                    className="text-xs text-[#0b9766] hover:underline"
+                    onClick={() => setShowNotifications(false)}
+                    className="text-[#91cab6] hover:text-white p-1"
                   >
-                    Clear All
+                    <FiX size={14} />
                   </button>
-                )}
+                </div>
               </div>
               {loadingNotifications ? (
                 <div className="px-3 py-3 text-[#91cab6] text-sm">Loading...</div>

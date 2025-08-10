@@ -146,11 +146,14 @@ export default function RecipeCard({ recipe }) {
         </div>
       )}
 
-      {/* Image Container */}
+      {/* Image Container - FIXED: Better loading screen */}
       <div className="relative h-40 sm:h-48 overflow-hidden flex-shrink-0">
         {imageLoading ? (
-          <div className="w-full h-full bg-[#19342a] animate-pulse flex items-center justify-center">
-            <div className="text-[#91cab6] text-sm">Loading...</div>
+          <div className="w-full h-full bg-[#19342a] flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-2 border-[#0b9766] border-t-transparent rounded-full animate-spin"></div>
+              <div className="text-[#91cab6] text-sm">Loading image...</div>
+            </div>
           </div>
         ) : (
           <img

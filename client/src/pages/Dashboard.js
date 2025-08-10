@@ -70,7 +70,7 @@ export default function Dashboard() {
         if (container.scrollLeft + container.offsetWidth >= container.scrollWidth - 10) {
           setTimeout(() => {
             if (container && container.scrollTo) {
-              container.scrollTo({ left: 0, behavior: 'smooth' });
+            container.scrollTo({ left: 0, behavior: 'smooth' });
             }
           }, 450);
         }
@@ -263,19 +263,19 @@ export default function Dashboard() {
       {/* Search Bar */}
       <div className="mb-8 sm:mb-10">
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="What do you want to cook today?"
-            className="flex-1 w-full px-4 py-3 sm:py-2 rounded-lg border border-[#326755] bg-[#19342a] text-white placeholder-[#91cab6] focus:outline-none focus:ring-2 focus:ring-[#0b9766] text-base"
-          />
-          <button
-            type="submit"
-            className="w-full sm:w-auto px-6 py-3 sm:py-2 rounded-lg bg-[#0b9766] text-white font-semibold hover:bg-[#059669] transition-colors text-base"
-          >
-            Search
-          </button>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="What do you want to cook today?"
+              className="flex-1 w-full px-4 py-3 sm:py-2 rounded-lg border border-[#326755] bg-[#19342a] text-white placeholder-[#91cab6] focus:outline-none focus:ring-2 focus:ring-[#0b9766] text-base"
+            />
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-6 py-3 sm:py-2 rounded-lg bg-[#0b9766] text-white font-semibold hover:bg-[#059669] transition-colors text-base"
+            >
+              Search
+            </button>
         </form>
       </div>
 
@@ -336,28 +336,28 @@ export default function Dashboard() {
 
       {/* Featured Recipes Carousel (show if not logged in or no recommendations) */}
       {(!user || recommendedRecipes.length === 0) && (
-        <div className="mb-8 sm:mb-10">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
-          <div 
-            ref={carouselRef}
-            className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', minHeight: '370px' }}
-          >
-            {quickRecipes.length === 0 ? (
-              <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
-            ) : (
-              quickRecipes.map(recipe => (
-                <div
-                  key={recipe.id}
-                  className="w-[calc(100%/3-1rem)] min-w-[300px] flex-shrink-0 cursor-pointer snap-center"
-                  onClick={() => handleRecipeClick(recipe)}
-                >
-                  <RecipeCard recipe={recipe} />
-                </div>
-              ))
-            )}
-          </div>
+      <div className="mb-8 sm:mb-10">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#91cab6] mb-4 px-2">Featured Recipes</h2>
+        <div 
+          ref={carouselRef}
+          className="w-full overflow-x-auto flex gap-3 sm:gap-4 pb-4 hide-scrollbar snap-x snap-mandatory px-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', minHeight: '370px' }}
+        >
+          {quickRecipes.length === 0 ? (
+            <div className="text-[#91cab6] px-2 py-8 text-center w-full">No quick recipes found.</div>
+          ) : (
+            quickRecipes.map(recipe => (
+              <div
+                key={recipe.id}
+                className="w-[calc(100%/3-1rem)] min-w-[300px] flex-shrink-0 cursor-pointer snap-center"
+                onClick={() => handleRecipeClick(recipe)}
+              >
+                <RecipeCard recipe={recipe} />
+              </div>
+            ))
+          )}
         </div>
+      </div>
       )}
 
       {/* Browse Recipes CTA */}

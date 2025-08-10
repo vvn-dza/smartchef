@@ -3,6 +3,7 @@ import { FiClock, FiUsers, FiStar, FiBookmark, FiShare2, FiYoutube, FiImage, FiZ
 import { useToast } from '../context/ToastContext';
 import { useRecipes } from '../context/RecipesContext';
 import LoadingSpinner from './LoadingSpinner';
+import { API_ENDPOINTS } from '../config/api';
 
 // Debug API keys
 console.log("API Keys check:", {
@@ -76,7 +77,7 @@ const fetchIndianRecipeImage = async (recipeTitle) => {
       console.log('Trying Indian search term:', term);
       
       const response = await fetch(
-        `http://localhost:5000/api/spoonacular/recipe-image?query=${encodeURIComponent(term)}`
+        `${API_ENDPOINTS.SPOONACULAR_RECIPE_IMAGE}?query=${encodeURIComponent(term)}`
       );
       
       if (response.ok) {
@@ -120,7 +121,7 @@ const fetchGeneralRecipeImage = async (recipeTitle) => {
       console.log('Trying general search strategy:', strategy);
       
       const response = await fetch(
-        `http://localhost:5000/api/spoonacular/recipe-image?query=${encodeURIComponent(strategy)}`
+        `${API_ENDPOINTS.SPOONACULAR_RECIPE_IMAGE}?query=${encodeURIComponent(strategy)}`
       );
       
       if (response.ok) {
@@ -237,7 +238,7 @@ export default function AIRecipeCard({ recipe, onClose }) {
       console.log("🎥 Searching YouTube for:", searchQuery);
       
       const response = await fetch(
-        `http://localhost:5000/api/youtube/search?q=${searchQuery}`
+        `${API_ENDPOINTS.YOUTUBE_SEARCH}?q=${searchQuery}`
       );
 
       if (response.ok) {

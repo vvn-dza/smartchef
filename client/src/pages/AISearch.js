@@ -7,6 +7,7 @@ import AIRecipeCard from '../components/AIRecipeCard';
 import { logUserActivity } from '../api/activityService';
 import { getIdToken } from 'firebase/auth';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { API_ENDPOINTS } from '../config/api';
 
 console.log("API Key loaded:", !!process.env.REACT_APP_GEMINI_API_KEY);
 console.log("API Key length:", process.env.REACT_APP_GEMINI_API_KEY?.length);
@@ -77,7 +78,7 @@ export default function AISearch() {
     try {
       console.log('Fetching image for:', recipeTitle);
       // Use backend proxy endpoint
-      let url = `http://localhost:5000/api/spoonacular/recipe-image?query=${encodeURIComponent(recipeTitle)}`;
+      let url = `${API_ENDPOINTS.SPOONACULAR_RECIPE_IMAGE}?query=${encodeURIComponent(recipeTitle)}`;
       if (cuisine) {
         url += `&cuisine=${encodeURIComponent(cuisine)}`;
       }
@@ -94,7 +95,7 @@ export default function AISearch() {
         }
       }
       // Fallback: try random food image
-      const randomResponse = await fetch('http://localhost:5000/api/spoonacular/recipe-image?query=food');
+      const randomResponse = await fetch(`${API_ENDPOINTS.SPOONACULAR_RECIPE_IMAGE}?query=food`);
       const randomData = await randomResponse.json();
       if (randomData.results && randomData.results.length > 0) {
         return randomData.results[0].image;
@@ -136,7 +137,7 @@ export default function AISearch() {
         console.log('Image data length:', imageData.length);
       }
       
-      const response = await fetch('http://localhost:5000/api/generate-recipe', {
+      const response = await fetch(API_ENDPOINTS.GENERATE_RECIPE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +175,7 @@ export default function AISearch() {
       if (user) {
         try {
           console.log('Storing recipe in database...');
-          const storeResponse = await fetch('http://localhost:5000/api/store-ai-recipe', {
+          const storeResponse = await fetch(API_ENDPOINTS.STORE_AI_RECIPE, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

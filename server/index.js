@@ -9,6 +9,17 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Configure CORS for production
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://smartchef-client.onrender.com', 'http://localhost:3000']
+    : true,
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
 // Debug environment variables
 console.log("=== Environment Variables Debug ===");
 console.log("GEMINI_API_KEY loaded:", !!process.env.GEMINI_API_KEY);
@@ -45,7 +56,6 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Middleware
-app.use(cors());
 app.use(express.json({ limit: '10mb' })); // For image data
 
 // Test endpoint

@@ -1,4 +1,6 @@
 // client/src/api/activityService.js
+import { API_ENDPOINTS } from '../config/api';
+
 export async function logUserActivity({ userId, idToken, type, recipeId, query }) {
   const maxRetries = 2;
   
@@ -9,7 +11,7 @@ export async function logUserActivity({ userId, idToken, type, recipeId, query }
 
       console.log(`Activity logging attempt ${attempt + 1}/${maxRetries + 1}: ${type}`);
       
-      const response = await fetch('http://localhost:5000/api/activity/log', {
+      const response = await fetch(API_ENDPOINTS.ACTIVITY_LOG, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,3 +51,19 @@ export async function logUserActivity({ userId, idToken, type, recipeId, query }
     }
   }
 }
+
+export const logActivity = async (activityData) => {
+  const response = await fetch(API_ENDPOINTS.ACTIVITY_LOG, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(activityData),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to log activity');
+  }
+  
+  return response.json();
+};

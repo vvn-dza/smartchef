@@ -13,6 +13,7 @@ import { useRecipes } from '../context/RecipesContext';
 import { fetchRecipeById } from '../api/recipeService';
 import { logUserActivity } from '../api/activityService';
 import { getIdToken } from 'firebase/auth';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function Dashboard() {
   const [search, setSearch] = useState('');
@@ -111,7 +112,7 @@ export default function Dashboard() {
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
         // Get food trivia for cooking tips
-        const triviaResponse = await fetch('http://localhost:5000/api/spoonacular/trivia', {
+        const triviaResponse = await fetch(API_ENDPOINTS.SPOONACULAR_TRIVIA, {
           signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -139,7 +140,7 @@ export default function Dashboard() {
         const ingredientController = new AbortController();
         const ingredientTimeoutId = setTimeout(() => ingredientController.abort(), 10000);
         
-        const ingredientResponse = await fetch(`http://localhost:5000/api/spoonacular/seasonal-ingredient?query=${encodeURIComponent(seasonalQuery)}`, {
+        const ingredientResponse = await fetch(`${API_ENDPOINTS.SPOONACULAR_SEASONAL_INGREDIENT}?query=${encodeURIComponent(seasonalQuery)}`, {
           signal: ingredientController.signal
         });
         clearTimeout(ingredientTimeoutId);

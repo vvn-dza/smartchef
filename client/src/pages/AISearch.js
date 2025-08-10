@@ -122,18 +122,32 @@ export default function AISearch() {
       }
       
       console.log('Generating recipe for:', searchText || 'image upload');
+      console.log('Image preview present:', !!imagePreview);
+      
+      // Prepare image data
+      let imageData = null;
+      if (imagePreview) {
+        // Check if it's already a data URL
+        if (imagePreview.startsWith('data:')) {
+          imageData = imagePreview.split(',')[1]; // Extract base64
+        } else {
+          imageData = imagePreview; // Assume it's already base64
+        }
+        console.log('Image data length:', imageData.length);
+      }
       
       const response = await fetch('http://localhost:5000/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           searchText: searchText.trim(),
-          imageData: imagePreview ? imagePreview.split(',')[1] : null
+          imageData: imageData
         })
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Server error response:', errorText);
         throw new Error(`Failed to generate recipe: ${errorText}`);
       }
       

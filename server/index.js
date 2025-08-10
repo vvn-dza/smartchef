@@ -68,22 +68,47 @@ app.post('/api/generate-recipe', async (req, res) => {
     }
 
     console.log("🔍 Generating recipe for:", searchText || "image upload");
+    console.log("Image data present:", !!imageData);
+    console.log("Image data length:", imageData ? imageData.length : 0);
 
-    // Choose the right model
-    const modelName = imageData ? "gemini-2.0-pro-vision" : "gemini-2.0-flash";
+    // Choose the right model - Use correct model names
+    const modelName = imageData ? "gemini-1.5-pro" : "gemini-1.5-flash";
     const model = genAI.getGenerativeModel({ model: modelName });
     
     let prompt = "";
     let imageParts = [];
 
     if (imageData) {
-      prompt = `Analyze this food image and provide a detailed recipe.`;
-      imageParts.push({
-        inlineData: {
-          data: imageData,
-          mimeType: "image/jpeg"
+      try {
+        // Validate image data format
+        if (!imageData.startsWith('data:image/')) {
+          // If it's just base64, assume it's JPEG
+          const base64Data = imageData;
+          imageParts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: "image/jpeg"
+            }
+          });
+        } else {
+          // Extract base64 from data URL
+          const base64Data = imageData.split(',')[1];
+          const mimeType = imageData.split(',')[0].split(':')[1].split(';')[0];
+          
+          imageParts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType || "image/jpeg"
+            }
+          });
         }
-      });
+        
+        prompt = `Analyze this food image and provide a detailed recipe.`;
+        console.log("✅ Image processed successfully");
+      } catch (imageError) {
+        console.error("❌ Image processing error:", imageError);
+        return res.status(400).json({ error: "Invalid image format" });
+      }
     } else {
       prompt = `Provide a detailed recipe for: "${searchText}"`;
     }
@@ -121,6 +146,7 @@ app.post('/api/generate-recipe', async (req, res) => {
     let cleanText = text.trim();
     // Remove triple backticks and optional 'json' after them
     cleanText = cleanText.replace(/^```json\s*/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+    
     // Try to extract JSON object if still not valid
     let recipe;
     try {
@@ -128,29 +154,32 @@ app.post('/api/generate-recipe', async (req, res) => {
       console.log("✅ Successfully parsed recipe JSON");
     } catch (e) {
       console.log("⚠️ Failed to parse JSON, trying to extract...");
+      console.log("Raw response:", cleanText);
       // Try to extract JSON from within the text
       const match = cleanText.match(/\{[\s\S]*\}/);
       if (match) {
-        recipe = JSON.parse(match[0]);
-        console.log("✅ Successfully extracted and parsed recipe JSON");
+        try {
+          recipe = JSON.parse(match[0]);
+          console.log("✅ Successfully extracted and parsed recipe JSON");
+        } catch (extractError) {
+          console.error("❌ Failed to parse extracted JSON:", extractError);
+          throw new Error("Invalid recipe format received from AI");
+        }
       } else {
-        throw e;
+        console.error("❌ No JSON found in response");
+        throw new Error("No valid recipe format received from AI");
       }
     }
     
     // Generate image for text-based recipes using Spoonacular
     if (!imageData && recipe.title && process.env.SPOONACULAR_API_KEY) {
       try {
-        console.log(" Fetching image for recipe:", recipe.title);
-        console.log("Spoonacular API Key present:", !!process.env.SPOONACULAR_API_KEY);
+        console.log("🖼️ Fetching image for recipe:", recipe.title);
         
         // Use Spoonacular to get a food image
         const imageUrl = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${process.env.SPOONACULAR_API_KEY}&query=${encodeURIComponent(recipe.title)}&number=1&addRecipeInformation=false`;
-        console.log("Spoonacular URL:", imageUrl.replace(process.env.SPOONACULAR_API_KEY, 'API_KEY_HIDDEN'));
         
         const imageResponse = await axios.get(imageUrl);
-        console.log("Spoonacular response status:", imageResponse.status);
-        console.log("Spoonacular response data:", imageResponse.data);
         
         if (imageResponse.data.results && imageResponse.data.results.length > 0) {
           recipe.imageUrl = imageResponse.data.results[0].image;
@@ -160,17 +189,8 @@ app.post('/api/generate-recipe', async (req, res) => {
         }
       } catch (imageError) {
         console.log("⚠️ Image generation failed:", imageError.message);
-        if (imageError.response) {
-          console.log("Spoonacular error response:", imageError.response.status, imageError.response.data);
-        }
         // Continue without image
       }
-    } else {
-      console.log("Image generation skipped:", {
-        hasImageData: !!imageData,
-        hasTitle: !!recipe.title,
-        hasSpoonacularKey: !!process.env.SPOONACULAR_API_KEY
-      });
     }
     
     // Send formatted response to frontend
@@ -185,8 +205,12 @@ app.post('/api/generate-recipe', async (req, res) => {
     // Provide user-friendly error messages
     if (error.message.includes('API key')) {
       res.status(500).json({ error: "API configuration error" });
-    } else if (error.message.includes('JSON')) {
+    } else if (error.message.includes('JSON') || error.message.includes('recipe format')) {
       res.status(500).json({ error: "Invalid recipe format received" });
+    } else if (error.message.includes('image')) {
+      res.status(500).json({ error: "Image processing error" });
+    } else if (error.message.includes('404') || error.message.includes('model')) {
+      res.status(500).json({ error: "AI model temporarily unavailable" });
     } else {
       res.status(500).json({ error: "Failed to generate recipe" });
     }
